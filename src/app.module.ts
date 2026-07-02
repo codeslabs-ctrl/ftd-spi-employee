@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
+import { HealthModule } from './health/health.module';
 import { TenancyModule } from './tenancy/tenancy.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -12,6 +13,7 @@ import { AppService } from './app.service';
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     DatabaseModule,
     AuthModule,
+    HealthModule,
     TenancyModule,
   ],
   controllers: [AppController],
