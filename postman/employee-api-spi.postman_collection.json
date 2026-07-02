@@ -83,7 +83,7 @@
             "url": "{{baseUrl}}/api/v1/employees",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idNumber\": \"12345678\",\n  \"nationality\": \"V\",\n  \"firstName\": \"MARIA\",\n  \"middleName\": \"ALEJANDRA\",\n  \"lastName\": \"PEREZ\",\n  \"secondLastName\": \"GOMEZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\"\n}"
+              "raw": "{\n  \"idNumber\": \"12345678\",\n  \"idType\": \"V\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"middleName\": \"ALEJANDRA\",\n  \"lastName\": \"PEREZ\",\n  \"secondLastName\": \"GOMEZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\",\n  \"maritalStatus\": \"SOLTERA\",\n  \"city\": \"CARACAS\",\n  \"mobile\": \"04141234567\",\n  \"email\": \"maria.perez@mail.com\"\n}"
             }
           }
         },
@@ -276,7 +276,7 @@
             "url": "{{baseUrl}}/api/v1/employees",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idNumber\": \"12345678\",\n  \"nationality\": \"V\",\n  \"firstName\": \"MARIA\",\n  \"lastName\": \"PEREZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\"\n}"
+              "raw": "{\n  \"idNumber\": \"12345678\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"lastName\": \"PEREZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\"\n}"
             }
           }
         }

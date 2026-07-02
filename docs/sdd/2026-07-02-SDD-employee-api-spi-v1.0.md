@@ -34,7 +34,7 @@
 
 ## 4. Drivers de diseño y decisiones clave
 
-- **PKG-first (estándar FTD):** toda escritura pasa por procedimientos de `corsox.pkg_management_employee` cuando existan; SQL directo solo como fallback documentado. La lógica de negocio permanece en la BD.
+- **PKG-first (estándar FTD):** toda la operación pasa por procedimientos de `corsox.pkg_management_employee` con el contrato estándar FTD `I_JSON CLOB → O_JSON CLOB / O_COD / O_MESSAGE`: los GET devuelven JSON con `JSON_ARRAYAGG/JSON_OBJECT` y las escrituras hacen `MERGE` parseando `I_JSON` con `JSON_TABLE`. Los códigos de respuesta usan `UTILITY.PKG_GLOBAL_CONSTANTS`. La lógica de negocio permanece en la BD.
 - **Multi-tenant en un solo despliegue:** un pool `oracledb` por país creado al bootstrap; `X-Country-Code` resuelve el pool por request. Habilitar un país nuevo = agregar variables `DB_<CC>_*`, sin código.
 - **Contrato en inglés, esquema en español:** el diccionario `EMPLOYEE_FIELD_MAP` (campo API → bind PKG → columna) es la única fuente de verdad; de él se generan binds, PL/SQL, UPDATE y mapeo de respuesta. Agregar un atributo = 1 campo DTO + 1 entrada del mapa.
 - **Seguridad autocontenida:** el propio servicio emite JWT RS256 (llaves en Secret Manager) con TTL de 12 horas y claim `countries` que restringe qué países puede usar cada cliente.
@@ -101,28 +101,37 @@ Crea los datos básicos del empleado envolviendo `prc_crear_datos_basicos`.
 ```json
 {
   "idNumber": "12345678",
-  "nationality": "V",
+  "idType": "V",
+  "nationality": "VENEZOLANO",
   "firstName": "MARIA",
   "middleName": "ALEJANDRA",
   "lastName": "PEREZ",
   "secondLastName": "GOMEZ",
   "birthDate": "1990-05-14",
-  "gender": "F"
+  "gender": "F",
+  "maritalStatus": "SOLTERA",
+  "address": "AV LIBERTADOR",
+  "city": "CARACAS",
+  "phone": "02121234567",
+  "mobile": "04141234567",
+  "email": "maria.perez@mail.com"
 }
 ```
+
+Obligatorios: `idNumber`, `nationality`, `firstName`, `lastName`, `birthDate`, `gender` (los NOT NULL de `EO_PERSONA`). El resto opcional.
 
 **Response sugerida** (201)
 ```json
 {
   "idNumber": "12345678",
-  "message": "OK"
+  "message": "TRANSACCION EXITOSA"
 }
 ```
 
 **Notas**
-- Todos los parámetros que el PKG exige son obligatorios en el body (origen funcional: `corsox.ftd_ingresos`).
-- Validación por campo con class-validator → 400 con detalle. Duplicado → 409. Regla de negocio del PKG → 422 con su mensaje.
-- [PENDIENTE: confirmar firma exacta de `prc_crear_datos_basicos` contra la BD espejo — Task 0 del plan; los campos listados son la firma asumida de trabajo]
+- El API arma `I_JSON = {"employees":[{...}]}` y llama `prc_merge_employee(I_JSON, O_COD, O_MESSAGE)`; el procedimiento hace `MERGE` sobre `EO_PERSONA` usando `JSON_TABLE` (patrón FTD), casando por `NUM_IDEN`.
+- `gender` viaja como `M`/`F` en el API; el PKG lo traduce a `SEXO` `'1'`/`'2'` con `DECODE`.
+- Validación por campo con class-validator (longitudes reales de columna: `firstName` ≤17, `middleName` ≤15, etc.) → 400 con detalle. Duplicado → 409. `O_COD` distinto de éxito → 422 con `O_MESSAGE`.
 
 ### GET /api/v1/employees/{idNumber}
 Consulta un empleado por identificación sobre `INFOCENT.EO_PERSONA`.
@@ -190,15 +199,40 @@ Liveness y readiness (incluye países con pool activo). Públicos, para Cloud Ru
 
 ## 9. Modelo de datos mínimo
 
-El servicio **no crea tablas propias**: opera sobre el esquema existente del SPI (Oracle, BD espejo de producción por país). La persistencia y las reglas de negocio de creación viven en el paquete `corsox.pkg_management_employee`.
+El servicio **no crea tablas propias**: opera sobre `INFOCENT.EO_PERSONA` (estructura real confirmada) a través de `corsox.pkg_management_employee` con el contrato JSON estándar FTD.
 
-| Tabla / Objeto | Campos imprescindibles | Uso |
+**Mapeo campo API → columna `EO_PERSONA`:**
+
+| Campo API | Columna | Tipo / Regla |
 |---|---|---|
-| `INFOCENT.EO_PERSONA` | CEDULA, NACIONALIDAD, PRIMER_NOMBRE, SEGUNDO_NOMBRE, PRIMER_APELLIDO, SEGUNDO_APELLIDO, FECHA_NACIMIENTO, SEXO, STATUS | Lectura (GET), actualización (PUT fallback), borrado lógico (DELETE) |
-| `corsox.pkg_management_employee.prc_crear_datos_basicos` | Parámetros IN según firma real + OUT código/mensaje | Creación del empleado (POST) |
-| `corsox.ftd_ingresos` | — | **No se consulta.** Es el origen funcional de los datos que el cliente envía como parámetros |
+| `idNumber` | `NUM_IDEN` | VARCHAR2(20), indexado (IDXEO_PER01) — identificador de negocio del API |
+| `idType` | `ID_TIPO_IDEN` | VARCHAR2(2), FK a `EO_TIPO_IDENTIFICACION` |
+| `nationality` | `NACIONAL` | VARCHAR2(50) NOT NULL |
+| `passport` | `PASAPORTE` | VARCHAR2(10) |
+| `firstName` / `middleName` | `NOMBRE1` / `NOMBRE2` | VARCHAR2(17) NOT NULL / VARCHAR2(15) |
+| `lastName` / `secondLastName` | `APELLIDO1` / `APELLIDO2` | VARCHAR2(17) NOT NULL / VARCHAR2(15) |
+| `birthDate` | `FECHA_NA` | DATE NOT NULL (API: `YYYY-MM-DD`) |
+| `gender` | `SEXO` | VARCHAR2(1) NOT NULL — API `M`/`F` ↔ tabla `'1'`/`'2'` (DECODE en el PKG) |
+| `maritalStatus` | `EDO_CIVIL` | VARCHAR2(30) |
+| `address` / `city` | `DIRECCION` / `CIUDAD` | VARCHAR2(120) / VARCHAR2(30) |
+| `phone` / `mobile` | `TELEFONO1` / `CELULAR` | VARCHAR2(15) |
+| `email` | `E_MAIL1` | VARCHAR2(60) |
 
-Idempotencia: la deduplicación la resuelve la BD (clave única de cédula → ORA-00001 → 409; o validación del propio PKG → 422).
+Notas del modelo:
+- El PK `ID` (NUMBER(20)) es **interno**; el API identifica por `NUM_IDEN`. El MERGE del PKG casa por `NUM_IDEN` e inserta con secuencia para `ID`.
+- `EO_PERSONA` **no tiene columna de status**: el borrado lógico usa `IN_REL_TRAB = 'N'` (indicador de relación laboral) y la auditoría usa `USRCRE/FECCRE/USRACT/FECACT`.
+- `corsox.ftd_ingresos` **no se consulta**: es el origen funcional de los datos que el cliente envía en el request.
+- Idempotencia: el MERGE es naturalmente idempotente por `NUM_IDEN`; validaciones del PKG → `O_COD` ≠ éxito → 422.
+
+**Procedimientos del PKG (contrato FTD `I_JSON/O_JSON/O_COD/O_MESSAGE`):**
+
+| Procedimiento | Entrada (I_JSON) | Salida | Uso en el API |
+|---|---|---|---|
+| `PRC_GET_EMPLOYEE` | `{"idNumber":"..."} ` o `{"page":n,"size":n}` | `O_JSON {"employees":[...]}` | GET by id / GET paginado |
+| `PRC_MERGE_EMPLOYEE` | `{"employees":[{...}]}` | `O_COD/O_MESSAGE` | POST (insert) y PUT (update) vía MERGE |
+| `PRC_DELETE_EMPLOYEE` | `{"idNumber":"..."}` | `O_COD/O_MESSAGE` | DELETE lógico (`IN_REL_TRAB='N'`) |
+
+El script completo del paquete (spec + body, estilo FTD) se entrega en `db/pkg_management_employee_api.sql`.
 
 ## 10. Flujos asíncronos / continuidad
 

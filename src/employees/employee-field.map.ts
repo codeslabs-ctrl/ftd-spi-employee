@@ -1,54 +1,34 @@
-export interface FieldMapping {
-  bind: string; // PKG parameter name
-  column: string; // column in INFOCENT.EO_PERSONA
-  updatable?: boolean;
-  sqlExpr?: string; // SQL expression for the bind (e.g. TO_DATE)
-}
+// API fields exchanged with corsox.pkg_management_employee as JSON (I_JSON / O_JSON).
+// Single source of truth on the Node side. Adding an attribute = one DTO field
+// (with validation) + one entry here + the matching JSON_TABLE column / JSON_OBJECT
+// key in the PKG script (db/pkg_management_employee_api.sql).
+export const EMPLOYEE_JSON_FIELDS = [
+  'idNumber', // NUM_IDEN
+  'idType', // ID_TIPO_IDEN
+  'nationality', // NACIONAL
+  'passport', // PASAPORTE
+  'firstName', // NOMBRE1
+  'middleName', // NOMBRE2
+  'lastName', // APELLIDO1
+  'secondLastName', // APELLIDO2
+  'birthDate', // FECHA_NA (YYYY-MM-DD)
+  'gender', // SEXO ('M'/'F' in the API; '1'/'2' in the table — DECODE in the PKG)
+  'maritalStatus', // EDO_CIVIL
+  'address', // DIRECCION
+  'city', // CIUDAD
+  'phone', // TELEFONO1
+  'mobile', // CELULAR
+  'email', // E_MAIL1
+] as const;
 
-// Single source of truth: API field → PKG bind → table column.
-// Adding an attribute = one DTO field (with validation) + one entry here;
-// binds, PL/SQL args, UPDATE clauses and response mapping derive from it.
-// Bind/column names assumed — locked once Task 0 confirms the real PKG signature.
-export const EMPLOYEE_FIELD_MAP: Record<string, FieldMapping> = {
-  idNumber: { bind: 'p_cedula', column: 'CEDULA' },
-  nationality: {
-    bind: 'p_nacionalidad',
-    column: 'NACIONALIDAD',
-    updatable: true,
-  },
-  firstName: {
-    bind: 'p_primer_nombre',
-    column: 'PRIMER_NOMBRE',
-    updatable: true,
-  },
-  middleName: {
-    bind: 'p_segundo_nombre',
-    column: 'SEGUNDO_NOMBRE',
-    updatable: true,
-  },
-  lastName: {
-    bind: 'p_primer_apellido',
-    column: 'PRIMER_APELLIDO',
-    updatable: true,
-  },
-  secondLastName: {
-    bind: 'p_segundo_apellido',
-    column: 'SEGUNDO_APELLIDO',
-    updatable: true,
-  },
-  birthDate: {
-    bind: 'p_fecha_nacimiento',
-    column: 'FECHA_NACIMIENTO',
-    updatable: true,
-    sqlExpr: "TO_DATE(:p_fecha_nacimiento, 'YYYY-MM-DD')",
-  },
-  gender: { bind: 'p_sexo', column: 'SEXO', updatable: true },
-};
+export type EmployeeJsonField = (typeof EMPLOYEE_JSON_FIELDS)[number];
 
-export function rowToEmployee(row: Record<string, unknown>) {
-  const out: Record<string, unknown> = {};
-  for (const [field, m] of Object.entries(EMPLOYEE_FIELD_MAP)) {
-    if (row[m.column] !== undefined) out[field] = row[m.column];
+// Picks only known, defined fields — the JSON sent to the PKG never carries extras.
+export function toEmployeePayload(dto: object): Record<string, unknown> {
+  const source = dto as Record<string, unknown>;
+  const payload: Record<string, unknown> = {};
+  for (const field of EMPLOYEE_JSON_FIELDS) {
+    if (source[field] !== undefined) payload[field] = source[field];
   }
-  return out;
+  return payload;
 }

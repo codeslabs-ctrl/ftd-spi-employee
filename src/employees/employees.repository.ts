@@ -10,9 +10,19 @@ import * as oracledb from 'oracledb';
 import { TenantConnectionService } from '../database/tenant-connection.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
-import { EMPLOYEE_FIELD_MAP, rowToEmployee } from './employee-field.map';
+import { toEmployeePayload } from './employee-field.map';
 
-const PKG_CREATE = 'corsox.pkg_management_employee.prc_crear_datos_basicos';
+const PKG = 'corsox.pkg_management_employee';
+
+// UTILITY.PKG_GLOBAL_CONSTANTS values — confirm against the mirror DB
+const SUCCESS_CODE = '0'; // GC_CODIGO_EXITO
+const NO_RECORDS_CODE = '1'; // GC_CODIGO_SIN_REGISTROS
+
+interface PkgResult {
+  json: string | null;
+  cod: string;
+  message: string;
+}
 
 @Injectable()
 export class EmployeesRepository {
@@ -32,115 +42,153 @@ export class EmployeesRepository {
     }
   }
 
+  private async readLob(value: unknown): Promise<string | null> {
+    if (value == null) return null;
+    if (typeof value === 'string') return value;
+    return (value as oracledb.Lob).getData() as Promise<string>;
+  }
+
+  private async callPkg(
+    conn: oracledb.Connection,
+    procedure: string,
+    inJson: Record<string, unknown>,
+    withOutJson: boolean,
+  ): Promise<PkgResult> {
+    const outJsonArg = withOutJson ? 'o_json => :o_json, ' : '';
+    const binds: oracledb.BindParameters = {
+      i_json: JSON.stringify(inJson),
+      o_cod: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 100 },
+      o_message: {
+        dir: oracledb.BIND_OUT,
+        type: oracledb.STRING,
+        maxSize: 4000,
+      },
+      ...(withOutJson
+        ? { o_json: { dir: oracledb.BIND_OUT, type: oracledb.CLOB } }
+        : {}),
+    };
+    const result = await conn.execute(
+      `BEGIN ${PKG}.${procedure}(i_json => :i_json, ${outJsonArg}o_cod => :o_cod, o_message => :o_message); END;`,
+      binds,
+      { autoCommit: true },
+    );
+    const out = result.outBinds as {
+      o_json?: unknown;
+      o_cod: string;
+      o_message: string;
+    };
+    return {
+      json: withOutJson ? await this.readLob(out.o_json) : null,
+      cod: String(out.o_cod),
+      message: out.o_message,
+    };
+  }
+
+  // O_COD following the FTD pattern: success constant, "no records" constant,
+  // or 'ORA-<sqlcode>' built by the WHEN OTHERS handler.
+  private assertPkgSuccess(res: PkgResult, notFoundOnNoRecords = false): void {
+    if (res.cod === SUCCESS_CODE) return;
+    if (res.cod === NO_RECORDS_CODE) {
+      if (notFoundOnNoRecords) throw new NotFoundException(res.message);
+      throw new UnprocessableEntityException(res.message);
+    }
+    if (res.cod.startsWith('ORA-')) {
+      if (res.cod.includes('-20'))
+        throw new UnprocessableEntityException(res.message);
+      throw new InternalServerErrorException();
+    }
+    throw new UnprocessableEntityException(res.message);
+  }
+
+  private parseEmployees(json: string | null): Record<string, unknown>[] {
+    if (!json) return [];
+    return (JSON.parse(json).employees ?? []) as Record<string, unknown>[];
+  }
+
   async create(country: string, dto: CreateEmployeeDto) {
     return this.withConn(country, async (conn) => {
-      const entries = Object.entries(EMPLOYEE_FIELD_MAP);
-      const args = entries
-        .map(([, m]) => `${m.bind} => ${m.sqlExpr ?? `:${m.bind}`}`)
-        .concat(['p_result_code => :p_result_code', 'p_message => :p_message'])
-        .join(', ');
-      const binds: Record<string, unknown> = {
-        p_result_code: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
-        p_message: {
-          dir: oracledb.BIND_OUT,
-          type: oracledb.STRING,
-          maxSize: 4000,
-        },
-      };
-      for (const [field, m] of entries) {
-        binds[m.bind] =
-          (dto as unknown as Record<string, unknown>)[field] ?? null;
-      }
-
-      const result = await conn.execute(
-        `BEGIN ${PKG_CREATE}(${args}); END;`,
-        binds,
-        {
-          autoCommit: true,
-        },
+      const res = await this.callPkg(
+        conn,
+        'prc_merge_employee',
+        { employees: [toEmployeePayload(dto)] },
+        false,
       );
-      const out = result.outBinds as {
-        p_result_code: number;
-        p_message: string;
-      };
-      if (out.p_result_code !== 0)
-        throw new UnprocessableEntityException(out.p_message);
-      return { idNumber: dto.idNumber, message: out.p_message };
+      this.assertPkgSuccess(res);
+      return { idNumber: dto.idNumber, message: res.message };
     });
   }
 
   async findById(country: string, idNumber: string) {
     return this.withConn(country, async (conn) => {
-      const r = await conn.execute(
-        `SELECT * FROM infocent.eo_persona WHERE cedula = :idNumber`,
+      const res = await this.callPkg(
+        conn,
+        'prc_get_employee',
         { idNumber },
-        { outFormat: oracledb.OUT_FORMAT_OBJECT },
+        true,
       );
-      const rows = r.rows as Record<string, unknown>[];
-      if (!rows?.length)
+      this.assertPkgSuccess(res, true);
+      const employees = this.parseEmployees(res.json);
+      if (!employees.length)
         throw new NotFoundException(`Employee ${idNumber} not found`);
-      return rowToEmployee(rows[0]);
+      return employees[0];
     });
   }
 
   async findAll(country: string, page: number, size: number) {
     return this.withConn(country, async (conn) => {
-      const r = await conn.execute(
-        `SELECT * FROM infocent.eo_persona ORDER BY cedula
-         OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY`,
-        { off: (page - 1) * size, lim: size },
-        { outFormat: oracledb.OUT_FORMAT_OBJECT },
+      const res = await this.callPkg(
+        conn,
+        'prc_get_employee',
+        { page, size },
+        true,
       );
-      return {
-        page,
-        size,
-        items: (r.rows as Record<string, unknown>[]).map(rowToEmployee),
-      };
+      if (res.cod === NO_RECORDS_CODE) return { page, size, items: [] };
+      this.assertPkgSuccess(res);
+      return { page, size, items: this.parseEmployees(res.json) };
     });
   }
 
-  // PUT/DELETE follow the PKG-first standard: once Task 0 confirms update/delete procedures
-  // in pkg_management_employee, wrap them like create(). Documented fallback: controlled
-  // UPDATE / logical delete on EO_PERSONA.
+  // The same MERGE procedure covers create and update (matched by idNumber).
   async update(country: string, idNumber: string, dto: UpdateEmployeeDto) {
     return this.withConn(country, async (conn) => {
-      const sets: string[] = [];
-      const binds: Record<string, unknown> = { idNumber };
-      for (const [field, m] of Object.entries(EMPLOYEE_FIELD_MAP)) {
-        const value = (dto as unknown as Record<string, unknown>)[field];
-        if (m.updatable && value !== undefined) {
-          sets.push(`${m.column} = :${field}`);
-          binds[field] = value;
-        }
-      }
-      if (!sets.length)
-        throw new UnprocessableEntityException('Nothing to update');
-      const r = await conn.execute(
-        `UPDATE infocent.eo_persona SET ${sets.join(', ')} WHERE cedula = :idNumber`,
-        binds,
-        { autoCommit: true },
-      );
-      if (!r.rowsAffected)
-        throw new NotFoundException(`Employee ${idNumber} not found`);
-      const found = await conn.execute(
-        `SELECT * FROM infocent.eo_persona WHERE cedula = :idNumber`,
+      const existing = await this.callPkg(
+        conn,
+        'prc_get_employee',
         { idNumber },
-        { outFormat: oracledb.OUT_FORMAT_OBJECT },
+        true,
       );
-      return rowToEmployee((found.rows as Record<string, unknown>[])[0]);
+      this.assertPkgSuccess(existing, true);
+      if (!this.parseEmployees(existing.json).length) {
+        throw new NotFoundException(`Employee ${idNumber} not found`);
+      }
+      const res = await this.callPkg(
+        conn,
+        'prc_merge_employee',
+        { employees: [toEmployeePayload({ ...(dto as object), idNumber })] },
+        false,
+      );
+      this.assertPkgSuccess(res);
+      const updated = await this.callPkg(
+        conn,
+        'prc_get_employee',
+        { idNumber },
+        true,
+      );
+      this.assertPkgSuccess(updated, true);
+      return this.parseEmployees(updated.json)[0];
     });
   }
 
+  // Logical delete: IN_REL_TRAB = 'N' — EO_PERSONA has no status column
   async softDelete(country: string, idNumber: string) {
     return this.withConn(country, async (conn) => {
-      const r = await conn.execute(
-        // status column name to be confirmed in Task 0
-        `UPDATE infocent.eo_persona SET status = 'I' WHERE cedula = :idNumber`,
+      const res = await this.callPkg(
+        conn,
+        'prc_delete_employee',
         { idNumber },
-        { autoCommit: true },
+        false,
       );
-      if (!r.rowsAffected)
-        throw new NotFoundException(`Employee ${idNumber} not found`);
+      this.assertPkgSuccess(res, true);
     });
   }
 
