@@ -27,11 +27,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = body;
       } else {
         const b = body as { error?: string; message?: string | string[] };
-        message = b.error ?? (Array.isArray(b.message) ? 'Bad Request' : (b.message ?? message));
+        message =
+          b.error ??
+          (Array.isArray(b.message) ? 'Bad Request' : (b.message ?? message));
         errors = Array.isArray(b.message) ? b.message : [];
       }
     } else {
-      this.logger.error(exception instanceof Error ? (exception.stack ?? exception.message) : String(exception));
+      this.logger.error(
+        exception instanceof Error
+          ? (exception.stack ?? exception.message)
+          : String(exception),
+      );
     }
 
     res.status(statusCode).json({

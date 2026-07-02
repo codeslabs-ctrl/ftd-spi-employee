@@ -13,12 +13,18 @@ const valid = {
 
 describe('CreateEmployeeDto', () => {
   it('accepts a valid payload', async () => {
-    expect(await validate(plainToInstance(CreateEmployeeDto, valid))).toHaveLength(0);
+    expect(
+      await validate(plainToInstance(CreateEmployeeDto, valid)),
+    ).toHaveLength(0);
   });
 
   it('rejects empty idNumber and invalid gender', async () => {
     const errors = await validate(
-      plainToInstance(CreateEmployeeDto, { ...valid, idNumber: '', gender: 'X' }),
+      plainToInstance(CreateEmployeeDto, {
+        ...valid,
+        idNumber: '',
+        gender: 'X',
+      }),
     );
     const props = errors.map((e) => e.property);
     expect(props).toEqual(expect.arrayContaining(['idNumber', 'gender']));

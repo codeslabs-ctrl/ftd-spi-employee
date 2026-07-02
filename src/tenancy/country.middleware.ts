@@ -17,7 +17,9 @@ export class CountryMiddleware implements NestMiddleware {
       .trim()
       .toUpperCase();
     if (!/^[A-Z]{2}$/.test(raw)) {
-      throw new BadRequestException(`Header ${COUNTRY_HEADER} is required (ISO 3166-1 alpha-2)`);
+      throw new BadRequestException(
+        `Header ${COUNTRY_HEADER} is required (ISO 3166-1 alpha-2)`,
+      );
     }
     const enabled = this.config.get('countries') ?? {};
     if (!enabled[raw]) {

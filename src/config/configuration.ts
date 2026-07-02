@@ -18,7 +18,12 @@ export interface ApiClient {
 export interface AppConfig {
   port: number;
   countries: Partial<Record<CountryCode, CountryDbConfig>>;
-  jwt: { privateKey: string; publicKey: string; ttlSeconds: number; issuer: string };
+  jwt: {
+    privateKey: string;
+    publicKey: string;
+    ttlSeconds: number;
+    issuer: string;
+  };
   apiClients: ApiClient[];
 }
 
@@ -42,8 +47,14 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
     port: Number(env.PORT ?? 8080),
     countries,
     jwt: {
-      privateKey: Buffer.from(env.JWT_PRIVATE_KEY_BASE64 ?? '', 'base64').toString('utf8'),
-      publicKey: Buffer.from(env.JWT_PUBLIC_KEY_BASE64 ?? '', 'base64').toString('utf8'),
+      privateKey: Buffer.from(
+        env.JWT_PRIVATE_KEY_BASE64 ?? '',
+        'base64',
+      ).toString('utf8'),
+      publicKey: Buffer.from(
+        env.JWT_PUBLIC_KEY_BASE64 ?? '',
+        'base64',
+      ).toString('utf8'),
       ttlSeconds: Number(env.JWT_TTL_SECONDS ?? 43200),
       issuer: env.JWT_ISSUER ?? 'employee-api-spi',
     },

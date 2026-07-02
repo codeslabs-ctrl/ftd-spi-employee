@@ -1,5 +1,8 @@
 jest.mock('oracledb', () => ({
-  createPool: jest.fn(async (o: { poolAlias: string }) => ({ alias: o.poolAlias, close: jest.fn() })),
+  createPool: jest.fn(async (o: { poolAlias: string }) => ({
+    alias: o.poolAlias,
+    close: jest.fn(),
+  })),
 }));
 
 import { ConfigService } from '@nestjs/config';
@@ -9,7 +12,13 @@ import { TenantConnectionService } from './tenant-connection.service';
 describe('TenantConnectionService', () => {
   const config = {
     get: () => ({
-      VE: { connectString: 'h/SPI', user: 'u', password: 'p', poolMin: 1, poolMax: 5 },
+      VE: {
+        connectString: 'h/SPI',
+        user: 'u',
+        password: 'p',
+        poolMin: 1,
+        poolMax: 5,
+      },
     }),
   } as unknown as ConfigService;
 
@@ -27,6 +36,14 @@ describe('TenantConnectionService', () => {
     );
     expect(svc.getPool('VE')).toBeDefined();
     expect(svc.enabledCountries()).toEqual(['VE']);
+  });
+
+  it('no countries configured → no pools created', async () => {
+    const svc = new TenantConnectionService({
+      get: () => undefined,
+    } as unknown as ConfigService);
+    await svc.onModuleInit();
+    expect(svc.enabledCountries()).toEqual([]);
   });
 
   it('getPool for a country without pool throws', async () => {

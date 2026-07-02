@@ -8,7 +8,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
   app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
   );
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
@@ -25,7 +29,11 @@ async function bootstrap() {
       schema: { type: 'string', example: 'VE' },
     })
     .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swaggerCfg));
+  SwaggerModule.setup(
+    'docs',
+    app,
+    SwaggerModule.createDocument(app, swaggerCfg),
+  );
 
   await app.listen(process.env.PORT ?? 8080);
 }

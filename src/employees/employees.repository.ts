@@ -41,17 +41,30 @@ export class EmployeesRepository {
         .join(', ');
       const binds: Record<string, unknown> = {
         p_result_code: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
-        p_message: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 4000 },
+        p_message: {
+          dir: oracledb.BIND_OUT,
+          type: oracledb.STRING,
+          maxSize: 4000,
+        },
       };
       for (const [field, m] of entries) {
-        binds[m.bind] = (dto as unknown as Record<string, unknown>)[field] ?? null;
+        binds[m.bind] =
+          (dto as unknown as Record<string, unknown>)[field] ?? null;
       }
 
-      const result = await conn.execute(`BEGIN ${PKG_CREATE}(${args}); END;`, binds, {
-        autoCommit: true,
-      });
-      const out = result.outBinds as { p_result_code: number; p_message: string };
-      if (out.p_result_code !== 0) throw new UnprocessableEntityException(out.p_message);
+      const result = await conn.execute(
+        `BEGIN ${PKG_CREATE}(${args}); END;`,
+        binds,
+        {
+          autoCommit: true,
+        },
+      );
+      const out = result.outBinds as {
+        p_result_code: number;
+        p_message: string;
+      };
+      if (out.p_result_code !== 0)
+        throw new UnprocessableEntityException(out.p_message);
       return { idNumber: dto.idNumber, message: out.p_message };
     });
   }
@@ -64,7 +77,8 @@ export class EmployeesRepository {
         { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
       const rows = r.rows as Record<string, unknown>[];
-      if (!rows?.length) throw new NotFoundException(`Employee ${idNumber} not found`);
+      if (!rows?.length)
+        throw new NotFoundException(`Employee ${idNumber} not found`);
       return rowToEmployee(rows[0]);
     });
   }
@@ -77,7 +91,11 @@ export class EmployeesRepository {
         { off: (page - 1) * size, lim: size },
         { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
-      return { page, size, items: (r.rows as Record<string, unknown>[]).map(rowToEmployee) };
+      return {
+        page,
+        size,
+        items: (r.rows as Record<string, unknown>[]).map(rowToEmployee),
+      };
     });
   }
 
@@ -95,13 +113,15 @@ export class EmployeesRepository {
           binds[field] = value;
         }
       }
-      if (!sets.length) throw new UnprocessableEntityException('Nothing to update');
+      if (!sets.length)
+        throw new UnprocessableEntityException('Nothing to update');
       const r = await conn.execute(
         `UPDATE infocent.eo_persona SET ${sets.join(', ')} WHERE cedula = :idNumber`,
         binds,
         { autoCommit: true },
       );
-      if (!r.rowsAffected) throw new NotFoundException(`Employee ${idNumber} not found`);
+      if (!r.rowsAffected)
+        throw new NotFoundException(`Employee ${idNumber} not found`);
       const found = await conn.execute(
         `SELECT * FROM infocent.eo_persona WHERE cedula = :idNumber`,
         { idNumber },
@@ -119,14 +139,16 @@ export class EmployeesRepository {
         { idNumber },
         { autoCommit: true },
       );
-      if (!r.rowsAffected) throw new NotFoundException(`Employee ${idNumber} not found`);
+      if (!r.rowsAffected)
+        throw new NotFoundException(`Employee ${idNumber} not found`);
     });
   }
 
   private mapOracleError(e: unknown): Error {
     if (e instanceof HttpException) return e;
     const ora = e as { errorNum?: number; message?: string };
-    if (ora?.errorNum === 1) return new ConflictException('Employee already exists');
+    if (ora?.errorNum === 1)
+      return new ConflictException('Employee already exists');
     if (ora?.errorNum && ora.errorNum >= 20000 && ora.errorNum <= 20999) {
       return new UnprocessableEntityException(
         String(ora.message ?? '').replace(/^ORA-\d+:\s*/, ''),

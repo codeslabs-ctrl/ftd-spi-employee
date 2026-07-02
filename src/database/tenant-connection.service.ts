@@ -17,7 +17,8 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit() {
-    const countries: Record<string, CountryDbConfig> = this.config.get('countries') ?? {};
+    const countries: Record<string, CountryDbConfig> =
+      this.config.get('countries') ?? {};
     for (const [cc, db] of Object.entries(countries)) {
       const pool = await oracledb.createPool({
         poolAlias: cc,
@@ -34,7 +35,10 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
 
   getPool(country: string): oracledb.Pool {
     const pool = this.pools.get(country);
-    if (!pool) throw new InternalServerErrorException(`No connection pool for ${country}`);
+    if (!pool)
+      throw new InternalServerErrorException(
+        `No connection pool for ${country}`,
+      );
     return pool;
   }
 

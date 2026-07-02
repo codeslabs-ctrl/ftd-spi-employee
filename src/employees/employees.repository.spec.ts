@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { TenantConnectionService } from '../database/tenant-connection.service';
 import { EmployeesRepository } from './employees.repository';
 
@@ -21,13 +25,17 @@ const dto = {
 
 describe('EmployeesRepository', () => {
   it('create calls the PKG with binds derived from EMPLOYEE_FIELD_MAP and returns the OUT result', async () => {
-    const execute: jest.Mock = jest.fn(async () => ({ outBinds: { p_result_code: 0, p_message: 'OK' } }));
+    const execute: jest.Mock = jest.fn(async () => ({
+      outBinds: { p_result_code: 0, p_message: 'OK' },
+    }));
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
     const res = await repo.create('VE', dto);
     expect(execute.mock.calls[0][0]).toContain(
       'corsox.pkg_management_employee.prc_crear_datos_basicos',
     );
-    expect(execute.mock.calls[0][0]).toContain("TO_DATE(:p_fecha_nacimiento, 'YYYY-MM-DD')");
+    expect(execute.mock.calls[0][0]).toContain(
+      "TO_DATE(:p_fecha_nacimiento, 'YYYY-MM-DD')",
+    );
     expect(execute.mock.calls[0][1]).toMatchObject({
       p_cedula: '12345678',
       p_primer_nombre: 'MARIA',
@@ -41,7 +49,9 @@ describe('EmployeesRepository', () => {
       outBinds: { p_result_code: 1, p_message: 'employee rejected' },
     }));
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
-    await expect(repo.create('VE', dto)).rejects.toThrow(UnprocessableEntityException);
+    await expect(repo.create('VE', dto)).rejects.toThrow(
+      UnprocessableEntityException,
+    );
   });
 
   it('findById maps Oracle columns to English API fields', async () => {
@@ -50,8 +60,26 @@ describe('EmployeesRepository', () => {
     }));
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
     const emp = await repo.findById('VE', '12345678');
-    expect(emp).toMatchObject({ idNumber: '12345678', firstName: 'MARIA', gender: 'F' });
+    expect(emp).toMatchObject({
+      idNumber: '12345678',
+      firstName: 'MARIA',
+      gender: 'F',
+    });
     expect(emp).not.toHaveProperty('CEDULA');
+  });
+
+  it('findAll paginates and maps rows', async () => {
+    const execute: jest.Mock = jest.fn(async () => ({
+      rows: [{ CEDULA: '1' }, { CEDULA: '2' }],
+    }));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const res = await repo.findAll('VE', 2, 10);
+    expect(execute.mock.calls[0][1]).toEqual({ off: 10, lim: 10 });
+    expect(res).toEqual({
+      page: 2,
+      size: 10,
+      items: [{ idNumber: '1' }, { idNumber: '2' }],
+    });
   });
 
   it('findById with no rows → NotFoundException', async () => {
@@ -64,9 +92,13 @@ describe('EmployeesRepository', () => {
     const execute: jest.Mock = jest
       .fn()
       .mockResolvedValueOnce({ rowsAffected: 1 })
-      .mockResolvedValueOnce({ rows: [{ CEDULA: '12345678', PRIMER_NOMBRE: 'ANA' }] });
+      .mockResolvedValueOnce({
+        rows: [{ CEDULA: '12345678', PRIMER_NOMBRE: 'ANA' }],
+      });
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
-    const emp = await repo.update('VE', '12345678', { firstName: 'ANA' } as any);
+    const emp = await repo.update('VE', '12345678', {
+      firstName: 'ANA',
+    } as any);
     expect(execute.mock.calls[0][0]).toContain('PRIMER_NOMBRE = :firstName');
     expect(execute.mock.calls[0][0]).not.toContain('SEXO');
     expect(emp).toMatchObject({ firstName: 'ANA' });
@@ -74,7 +106,9 @@ describe('EmployeesRepository', () => {
 
   it('update with empty body → 422', async () => {
     const repo = new EmployeesRepository(tenantSvc(mockPool(jest.fn())));
-    await expect(repo.update('VE', '1', {} as any)).rejects.toThrow(UnprocessableEntityException);
+    await expect(repo.update('VE', '1', {} as any)).rejects.toThrow(
+      UnprocessableEntityException,
+    );
   });
 
   it('softDelete on missing employee → 404', async () => {
@@ -85,7 +119,9 @@ describe('EmployeesRepository', () => {
 
   it('ORA-00001 (duplicate) → ConflictException', async () => {
     const execute: jest.Mock = jest.fn(async () => {
-      throw Object.assign(new Error('unique constraint violated'), { errorNum: 1 });
+      throw Object.assign(new Error('unique constraint violated'), {
+        errorNum: 1,
+      });
     });
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
     await expect(repo.create('VE', dto)).rejects.toThrow(ConflictException);
@@ -93,10 +129,14 @@ describe('EmployeesRepository', () => {
 
   it('RAISE_APPLICATION_ERROR -20xxx → UnprocessableEntityException with PKG message', async () => {
     const execute: jest.Mock = jest.fn(async () => {
-      throw Object.assign(new Error('ORA-20001: id already registered'), { errorNum: 20001 });
+      throw Object.assign(new Error('ORA-20001: id already registered'), {
+        errorNum: 20001,
+      });
     });
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
-    await expect(repo.create('VE', dto)).rejects.toThrow('id already registered');
+    await expect(repo.create('VE', dto)).rejects.toThrow(
+      'id already registered',
+    );
   });
 
   it('always closes the connection, even on error', async () => {

@@ -11,11 +11,31 @@ export interface FieldMapping {
 // Bind/column names assumed — locked once Task 0 confirms the real PKG signature.
 export const EMPLOYEE_FIELD_MAP: Record<string, FieldMapping> = {
   idNumber: { bind: 'p_cedula', column: 'CEDULA' },
-  nationality: { bind: 'p_nacionalidad', column: 'NACIONALIDAD', updatable: true },
-  firstName: { bind: 'p_primer_nombre', column: 'PRIMER_NOMBRE', updatable: true },
-  middleName: { bind: 'p_segundo_nombre', column: 'SEGUNDO_NOMBRE', updatable: true },
-  lastName: { bind: 'p_primer_apellido', column: 'PRIMER_APELLIDO', updatable: true },
-  secondLastName: { bind: 'p_segundo_apellido', column: 'SEGUNDO_APELLIDO', updatable: true },
+  nationality: {
+    bind: 'p_nacionalidad',
+    column: 'NACIONALIDAD',
+    updatable: true,
+  },
+  firstName: {
+    bind: 'p_primer_nombre',
+    column: 'PRIMER_NOMBRE',
+    updatable: true,
+  },
+  middleName: {
+    bind: 'p_segundo_nombre',
+    column: 'SEGUNDO_NOMBRE',
+    updatable: true,
+  },
+  lastName: {
+    bind: 'p_primer_apellido',
+    column: 'PRIMER_APELLIDO',
+    updatable: true,
+  },
+  secondLastName: {
+    bind: 'p_segundo_apellido',
+    column: 'SEGUNDO_APELLIDO',
+    updatable: true,
+  },
   birthDate: {
     bind: 'p_fecha_nacimiento',
     column: 'FECHA_NACIMIENTO',

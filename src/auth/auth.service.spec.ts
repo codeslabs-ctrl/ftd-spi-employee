@@ -23,7 +23,9 @@ describe('AuthService.issueToken', () => {
     const res = new AuthService(config).issueToken('hr-app', 's3cret');
     expect(res.token_type).toBe('Bearer');
     expect(res.expires_in).toBe(43200);
-    const decoded = jwt.verify(res.access_token, publicKey, { algorithms: ['RS256'] }) as jwt.JwtPayload;
+    const decoded = jwt.verify(res.access_token, publicKey, {
+      algorithms: ['RS256'],
+    }) as jwt.JwtPayload;
     expect(decoded.sub).toBe('hr-app');
     expect(decoded.iss).toBe('employee-api-spi');
     expect(decoded.countries).toEqual(['VE']);

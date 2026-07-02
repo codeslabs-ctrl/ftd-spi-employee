@@ -6,7 +6,17 @@ export class TenancyModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(CountryMiddleware)
-      .exclude('api/v1/auth/(.*)', 'health', 'health/(.*)', 'docs')
+      // exclude patterns with and without the global prefix — Nest matches middleware
+      // paths differently depending on version/prefix configuration
+      .exclude(
+        'auth/(.*)',
+        'api/v1/auth/(.*)',
+        'health',
+        'health/ready',
+        'health/(.*)',
+        'docs',
+        'docs/(.*)',
+      )
       .forRoutes('*');
   }
 }

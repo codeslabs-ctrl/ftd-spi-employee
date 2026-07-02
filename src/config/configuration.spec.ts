@@ -9,7 +9,13 @@ describe('buildConfig', () => {
       JWT_TTL_SECONDS: '43200',
     } as NodeJS.ProcessEnv);
     expect(cfg.countries).toEqual({
-      VE: { connectString: 'h:1521/SPI', user: 'u', password: 'p', poolMin: 1, poolMax: 5 },
+      VE: {
+        connectString: 'h:1521/SPI',
+        user: 'u',
+        password: 'p',
+        poolMin: 1,
+        poolMax: 5,
+      },
     });
     expect(cfg.jwt.ttlSeconds).toBe(43200);
   });
@@ -19,14 +25,22 @@ describe('buildConfig', () => {
     expect(cfg.countries.AR).toBeUndefined();
   });
 
+  it('default export builds config from process.env', async () => {
+    const factory = (await import('./configuration')).default;
+    expect(factory()).toHaveProperty('countries');
+  });
+
   it('decodes base64 JWT keys and parses API clients', () => {
     const cfg = buildConfig({
       JWT_PRIVATE_KEY_BASE64: Buffer.from('PRIV').toString('base64'),
       JWT_PUBLIC_KEY_BASE64: Buffer.from('PUB').toString('base64'),
-      API_CLIENTS_JSON: '[{"clientId":"a","secretHash":"h","countries":["VE"]}]',
+      API_CLIENTS_JSON:
+        '[{"clientId":"a","secretHash":"h","countries":["VE"]}]',
     } as NodeJS.ProcessEnv);
     expect(cfg.jwt.privateKey).toBe('PRIV');
     expect(cfg.jwt.publicKey).toBe('PUB');
-    expect(cfg.apiClients).toEqual([{ clientId: 'a', secretHash: 'h', countries: ['VE'] }]);
+    expect(cfg.apiClients).toEqual([
+      { clientId: 'a', secretHash: 'h', countries: ['VE'] },
+    ]);
   });
 });
