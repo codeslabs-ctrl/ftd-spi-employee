@@ -45,7 +45,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message,
       errors,
       timestamp: new Date().toISOString(),
-      path: req.url,
+      // originalUrl: middleware-thrown errors see a mount-relative req.url ('/')
+      path: req.originalUrl ?? req.url,
     });
   }
 }
