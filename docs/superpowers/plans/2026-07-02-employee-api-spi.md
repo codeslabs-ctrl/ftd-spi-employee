@@ -81,7 +81,7 @@ prc_crear_datos_basicos(
 )
 ```
 
-Si la firma real difiere (lo esperable), actualizar: `CreateEmployeeDto` (Task 7), los binds del repositorio (Task 8) y los tests correspondientes. **No continuar con la Task 8 sin la firma real.**
+Si la firma real difiere (lo esperable), actualizar: `CreateEmployeeDto` (Task 7), el diccionario `EMPLOYEE_FIELD_MAP` y los OUT binds del repositorio (Task 8), y los tests correspondientes. El contrato del API se mantiene en inglés; solo cambian los nombres de binds/columnas del lado Oracle. **No continuar con la Task 8 sin la firma real.**
 
 - [ ] **Step 4: Commit**
 
@@ -148,7 +148,30 @@ npm run build && npm test
 ```
 Expected: build OK, test de ejemplo PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Configurar cobertura para SonarQube.** En `package.json`, sección `jest`, agregar:
+
+```json
+"collectCoverageFrom": ["src/**/*.ts", "!src/main.ts", "!src/**/*.module.ts", "!src/**/*.dto.ts"],
+"coverageReporters": ["text", "lcov"],
+"coverageThreshold": { "global": { "branches": 80, "functions": 80, "lines": 80, "statements": 80 } }
+```
+
+Crear `sonar-project.properties` en la raíz:
+
+```properties
+sonar.projectKey=employee-api-spi
+sonar.projectName=Employee API SPI
+sonar.sources=src
+sonar.tests=src,test
+sonar.test.inclusions=**/*.spec.ts,**/*.e2e-spec.ts
+sonar.exclusions=**/node_modules/**,**/dist/**,**/*.module.ts,src/main.ts
+sonar.javascript.lcov.reportPaths=coverage/lcov.info
+sonar.typescript.tsconfigPaths=tsconfig.json
+```
+
+Verificar: `npm test -- --coverage` genera `coverage/lcov.info`. (El umbral fallará mientras no exista código — es esperado; se valida verde a partir de la Task 9.)
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -379,7 +402,7 @@ export class CountryMiddleware implements NestMiddleware {
   use(req: any, _res: any, next: () => void) {
     const raw = (req.headers[COUNTRY_HEADER] ?? '').toString().trim().toUpperCase();
     if (!/^[A-Z]{2}$/.test(raw)) {
-      throw new BadRequestException(`Header ${COUNTRY_HEADER} es obligatorio (ISO 3166-1 alfa-2)`);
+      throw new BadRequestException(`Header ${COUNTRY_HEADER} is required (ISO 3166-1 alpha-2)`);
     }
     const enabled = this.config.get('countries') ?? {};
     if (!enabled[raw]) {
@@ -694,18 +717,18 @@ import { validate } from 'class-validator';
 import { CreateEmployeeDto } from './create-employee.dto';
 
 const valid = {
-  cedula: '12345678', nacionalidad: 'V', primerNombre: 'MARIA', primerApellido: 'PEREZ',
-  fechaNacimiento: '1990-05-14', sexo: 'F',
+  idNumber: '12345678', nationality: 'V', firstName: 'MARIA', lastName: 'PEREZ',
+  birthDate: '1990-05-14', gender: 'F',
 };
 
 describe('CreateEmployeeDto', () => {
-  it('acepta un payload válido', async () => {
+  it('accepts a valid payload', async () => {
     expect(await validate(plainToInstance(CreateEmployeeDto, valid))).toHaveLength(0);
   });
-  it('rechaza cedula vacía y sexo inválido', async () => {
-    const errors = await validate(plainToInstance(CreateEmployeeDto, { ...valid, cedula: '', sexo: 'X' }));
+  it('rejects empty idNumber and invalid gender', async () => {
+    const errors = await validate(plainToInstance(CreateEmployeeDto, { ...valid, idNumber: '', gender: 'X' }));
     const props = errors.map(e => e.property);
-    expect(props).toEqual(expect.arrayContaining(['cedula', 'sexo']));
+    expect(props).toEqual(expect.arrayContaining(['idNumber', 'gender']));
   });
 });
 ```
@@ -718,18 +741,18 @@ describe('CreateEmployeeDto', () => {
 import { IsDateString, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 export class CreateEmployeeDto {
-  @IsString() @IsNotEmpty() @Matches(/^\d{5,10}$/) cedula: string;
-  @IsIn(['V', 'E']) nacionalidad: string;
-  @IsString() @IsNotEmpty() @MaxLength(50) primerNombre: string;
-  @IsOptional() @IsString() @MaxLength(50) segundoNombre?: string;
-  @IsString() @IsNotEmpty() @MaxLength(50) primerApellido: string;
-  @IsOptional() @IsString() @MaxLength(50) segundoApellido?: string;
-  @IsDateString() fechaNacimiento: string;
-  @IsIn(['M', 'F']) sexo: string;
+  @IsString() @IsNotEmpty() @Matches(/^\d{5,10}$/) idNumber: string;
+  @IsIn(['V', 'E']) nationality: string;
+  @IsString() @IsNotEmpty() @MaxLength(50) firstName: string;
+  @IsOptional() @IsString() @MaxLength(50) middleName?: string;
+  @IsString() @IsNotEmpty() @MaxLength(50) lastName: string;
+  @IsOptional() @IsString() @MaxLength(50) secondLastName?: string;
+  @IsDateString() birthDate: string;
+  @IsIn(['M', 'F']) gender: string;
 }
 ```
 
-`update-employee.dto.ts`: `export class UpdateEmployeeDto extends PartialType(OmitType(CreateEmployeeDto, ['cedula'] as const)) {}` (importar `PartialType`, `OmitType` de `@nestjs/swagger`).
+`update-employee.dto.ts`: `export class UpdateEmployeeDto extends PartialType(OmitType(CreateEmployeeDto, ['idNumber'] as const)) {}` (importar `PartialType`, `OmitType` de `@nestjs/swagger`).
 
 `list-employees.query.ts`:
 
@@ -756,6 +779,7 @@ git commit -m "feat: DTOs de empleado con validación class-validator"
 ### Task 8: Repositorio Oracle (PKG + consultas EO_PERSONA + mapeo de errores)
 
 **Files:**
+- Create: `src/employees/employee-field.map.ts` (diccionario campo API → bind PKG → columna)
 - Create: `src/employees/employees.repository.ts`
 - Test: `src/employees/employees.repository.spec.ts`
 
@@ -773,17 +797,25 @@ function mockPool(executeImpl: jest.Mock) {
 }
 const tenantSvc = (pool: any) => ({ getPool: () => pool }) as any;
 const dto = {
-  cedula: '12345678', nacionalidad: 'V', primerNombre: 'MARIA', primerApellido: 'PEREZ',
-  fechaNacimiento: '1990-05-14', sexo: 'F',
+  idNumber: '12345678', nationality: 'V', firstName: 'MARIA', lastName: 'PEREZ',
+  birthDate: '1990-05-14', gender: 'F',
 } as any;
 
-describe('EmployeesRepository.create', () => {
-  it('llama al PKG con binds y retorna el resultado OUT', async () => {
-    const execute = jest.fn(async () => ({ outBinds: { p_codigo_resultado: 0, p_mensaje: 'OK' } }));
+describe('EmployeesRepository', () => {
+  it('create llama al PKG con binds derivados del FIELD_MAP y retorna el resultado OUT', async () => {
+    const execute = jest.fn(async () => ({ outBinds: { p_result_code: 0, p_message: 'OK' } }));
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
     await repo.create('VE', dto);
     expect(execute.mock.calls[0][0]).toContain('corsox.pkg_management_employee.prc_crear_datos_basicos');
-    expect(execute.mock.calls[0][1]).toMatchObject({ p_cedula: '12345678' });
+    expect(execute.mock.calls[0][1]).toMatchObject({ p_cedula: '12345678', p_primer_nombre: 'MARIA' });
+  });
+
+  it('findById mapea columnas Oracle a campos del API en inglés', async () => {
+    const execute = jest.fn(async () => ({ rows: [{ CEDULA: '12345678', PRIMER_NOMBRE: 'MARIA', SEXO: 'F' }] }));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const emp = await repo.findById('VE', '12345678');
+    expect(emp).toMatchObject({ idNumber: '12345678', firstName: 'MARIA', gender: 'F' });
+    expect(emp).not.toHaveProperty('CEDULA');
   });
 
   it('ORA-00001 (duplicado) → ConflictException', async () => {
@@ -793,7 +825,7 @@ describe('EmployeesRepository.create', () => {
   });
 
   it('RAISE_APPLICATION_ERROR -20xxx → UnprocessableEntityException con mensaje del PKG', async () => {
-    const execute = jest.fn(async () => { throw Object.assign(new Error('ORA-20001: cedula ya registrada'), { errorNum: 20001 }); });
+    const execute = jest.fn(async () => { throw Object.assign(new Error('ORA-20001: id already registered'), { errorNum: 20001 }); });
     const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
     await expect(repo.create('VE', dto)).rejects.toThrow(UnprocessableEntityException);
   });
@@ -802,7 +834,39 @@ describe('EmployeesRepository.create', () => {
 
 - [ ] **Step 2: Correr y ver fallo**: `npx jest src/employees/employees.repository` → FAIL.
 
-- [ ] **Step 3: Implementación** — `src/employees/employees.repository.ts`:
+- [ ] **Step 3: Implementación.** Primero el diccionario de mapeo — `src/employees/employee-field.map.ts` — **única fuente de verdad** campo API → bind PKG → columna. Agregar un atributo nuevo = 1 campo en el DTO + 1 entrada aquí; binds, PL/SQL, UPDATE y mapeo de respuesta se derivan solos:
+
+```typescript
+export interface FieldMapping {
+  bind: string;      // nombre del parámetro del PKG
+  column: string;    // columna en INFOCENT.EO_PERSONA
+  updatable?: boolean;
+  sqlExpr?: string;  // expresión SQL para el bind (ej: TO_DATE)
+}
+
+// Binds y columnas asumidos — ajustar con el resultado de la Task 0
+export const EMPLOYEE_FIELD_MAP: Record<string, FieldMapping> = {
+  idNumber:       { bind: 'p_cedula',           column: 'CEDULA' },
+  nationality:    { bind: 'p_nacionalidad',     column: 'NACIONALIDAD',    updatable: true },
+  firstName:      { bind: 'p_primer_nombre',    column: 'PRIMER_NOMBRE',   updatable: true },
+  middleName:     { bind: 'p_segundo_nombre',   column: 'SEGUNDO_NOMBRE',  updatable: true },
+  lastName:       { bind: 'p_primer_apellido',  column: 'PRIMER_APELLIDO', updatable: true },
+  secondLastName: { bind: 'p_segundo_apellido', column: 'SEGUNDO_APELLIDO', updatable: true },
+  birthDate:      { bind: 'p_fecha_nacimiento', column: 'FECHA_NACIMIENTO', updatable: true,
+                    sqlExpr: "TO_DATE(:p_fecha_nacimiento, 'YYYY-MM-DD')" },
+  gender:         { bind: 'p_sexo',             column: 'SEXO',            updatable: true },
+};
+
+export function rowToEmployee(row: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [field, m] of Object.entries(EMPLOYEE_FIELD_MAP)) {
+    if (row[m.column] !== undefined) out[field] = row[m.column];
+  }
+  return out;
+}
+```
+
+Luego `src/employees/employees.repository.ts`, que genera todo desde el mapa:
 
 ```typescript
 import { ConflictException, Injectable, InternalServerErrorException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
@@ -810,6 +874,9 @@ import * as oracledb from 'oracledb';
 import { TenantConnectionService } from '../database/tenant-connection.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { EMPLOYEE_FIELD_MAP, rowToEmployee } from './employee-field.map';
+
+const PKG_CREATE = 'corsox.pkg_management_employee.prc_crear_datos_basicos';
 
 @Injectable()
 export class EmployeesRepository {
@@ -824,38 +891,36 @@ export class EmployeesRepository {
 
   async create(country: string, dto: CreateEmployeeDto) {
     return this.withConn(country, async (conn) => {
+      // Argumentos y binds generados desde EMPLOYEE_FIELD_MAP
+      const entries = Object.entries(EMPLOYEE_FIELD_MAP);
+      const args = entries
+        .map(([, m]) => `${m.bind} => ${m.sqlExpr ?? `:${m.bind}`}`)
+        .concat(['p_result_code => :p_result_code', 'p_message => :p_message'])
+        .join(', ');
+      const binds: Record<string, unknown> = {
+        p_result_code: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+        p_message: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 4000 },
+      };
+      for (const [field, m] of entries) binds[m.bind] = (dto as any)[field] ?? null;
+
       const result = await conn.execute(
-        `BEGIN corsox.pkg_management_employee.prc_crear_datos_basicos(
-           p_cedula => :p_cedula, p_nacionalidad => :p_nacionalidad,
-           p_primer_nombre => :p_primer_nombre, p_segundo_nombre => :p_segundo_nombre,
-           p_primer_apellido => :p_primer_apellido, p_segundo_apellido => :p_segundo_apellido,
-           p_fecha_nacimiento => TO_DATE(:p_fecha_nacimiento, 'YYYY-MM-DD'), p_sexo => :p_sexo,
-           p_codigo_resultado => :p_codigo_resultado, p_mensaje => :p_mensaje); END;`,
-        {
-          p_cedula: dto.cedula, p_nacionalidad: dto.nacionalidad,
-          p_primer_nombre: dto.primerNombre, p_segundo_nombre: dto.segundoNombre ?? null,
-          p_primer_apellido: dto.primerApellido, p_segundo_apellido: dto.segundoApellido ?? null,
-          p_fecha_nacimiento: dto.fechaNacimiento, p_sexo: dto.sexo,
-          p_codigo_resultado: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
-          p_mensaje: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 4000 },
-        },
-        { autoCommit: true },
+        `BEGIN ${PKG_CREATE}(${args}); END;`, binds, { autoCommit: true },
       );
       const out = result.outBinds as any;
-      if (out.p_codigo_resultado !== 0) throw new UnprocessableEntityException(out.p_mensaje);
-      return { cedula: dto.cedula, mensaje: out.p_mensaje };
+      if (out.p_result_code !== 0) throw new UnprocessableEntityException(out.p_message);
+      return { idNumber: dto.idNumber, message: out.p_message };
     });
   }
 
-  async findById(country: string, cedula: string) {
+  async findById(country: string, idNumber: string) {
     return this.withConn(country, async (conn) => {
       const r = await conn.execute(
-        `SELECT * FROM infocent.eo_persona WHERE cedula = :cedula`, // columnas: ajustar con Task 0
-        { cedula }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
+        `SELECT * FROM infocent.eo_persona WHERE cedula = :idNumber`,
+        { idNumber }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
       const rows = r.rows as any[];
-      if (!rows?.length) throw new NotFoundException(`Empleado ${cedula} no encontrado`);
-      return rows[0];
+      if (!rows?.length) throw new NotFoundException(`Employee ${idNumber} not found`);
+      return rowToEmployee(rows[0]);
     });
   }
 
@@ -866,45 +931,43 @@ export class EmployeesRepository {
          OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY`,
         { off: (page - 1) * size, lim: size }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
-      return { page, size, items: r.rows };
+      return { page, size, items: (r.rows as any[]).map(rowToEmployee) };
     });
   }
 
-  // PUT/DELETE: si Task 0 encontró procedimientos del PKG, envolverlos igual que create().
-  // Fallback documentado en el spec: UPDATE controlado / borrado lógico por status.
-  async update(country: string, cedula: string, dto: UpdateEmployeeDto) {
+  // PUT/DELETE: si Task 0 encontró procedimientos del PKG, envolverlos igual que create()
+  // (estándar FTD: PKG-first). Fallback documentado en el spec: UPDATE controlado / borrado lógico.
+  async update(country: string, idNumber: string, dto: UpdateEmployeeDto) {
     return this.withConn(country, async (conn) => {
-      const sets: string[] = []; const binds: any = { cedula };
-      const map: Record<string, string> = {
-        primerNombre: 'primer_nombre', segundoNombre: 'segundo_nombre',
-        primerApellido: 'primer_apellido', segundoApellido: 'segundo_apellido', sexo: 'sexo',
-      };
-      for (const [k, col] of Object.entries(map)) {
-        if ((dto as any)[k] !== undefined) { sets.push(`${col} = :${k}`); binds[k] = (dto as any)[k]; }
+      const sets: string[] = []; const binds: Record<string, unknown> = { idNumber };
+      for (const [field, m] of Object.entries(EMPLOYEE_FIELD_MAP)) {
+        if (m.updatable && (dto as any)[field] !== undefined) {
+          sets.push(`${m.column} = :${field}`); binds[field] = (dto as any)[field];
+        }
       }
-      if (!sets.length) throw new UnprocessableEntityException('Nada que actualizar');
+      if (!sets.length) throw new UnprocessableEntityException('Nothing to update');
       const r = await conn.execute(
-        `UPDATE infocent.eo_persona SET ${sets.join(', ')} WHERE cedula = :cedula`,
+        `UPDATE infocent.eo_persona SET ${sets.join(', ')} WHERE cedula = :idNumber`,
         binds, { autoCommit: true },
       );
-      if (!r.rowsAffected) throw new NotFoundException(`Empleado ${cedula} no encontrado`);
-      return this.findById(country, cedula);
+      if (!r.rowsAffected) throw new NotFoundException(`Employee ${idNumber} not found`);
+      return this.findById(country, idNumber);
     });
   }
 
-  async softDelete(country: string, cedula: string) {
+  async softDelete(country: string, idNumber: string) {
     return this.withConn(country, async (conn) => {
       const r = await conn.execute(
-        `UPDATE infocent.eo_persona SET status = 'I' WHERE cedula = :cedula`, // columna status: ajustar con Task 0
-        { cedula }, { autoCommit: true },
+        `UPDATE infocent.eo_persona SET status = 'I' WHERE cedula = :idNumber`, // columna status: ajustar con Task 0
+        { idNumber }, { autoCommit: true },
       );
-      if (!r.rowsAffected) throw new NotFoundException(`Empleado ${cedula} no encontrado`);
+      if (!r.rowsAffected) throw new NotFoundException(`Employee ${idNumber} not found`);
     });
   }
 
   private mapOracleError(e: any): Error {
     if (e instanceof ConflictException || e instanceof NotFoundException || e instanceof UnprocessableEntityException) return e;
-    if (e?.errorNum === 1) return new ConflictException('El empleado ya existe');
+    if (e?.errorNum === 1) return new ConflictException('Employee already exists');
     if (e?.errorNum >= 20000 && e?.errorNum <= 20999) {
       return new UnprocessableEntityException(String(e.message).replace(/^ORA-\d+:\s*/, ''));
     }
@@ -913,13 +976,15 @@ export class EmployeesRepository {
 }
 ```
 
+Nota: los nombres de los OUT binds (`p_result_code`/`p_message`) también se ajustan a los reales del PKG en la Task 0 (probablemente `p_codigo_resultado`/`p_mensaje`).
+
 - [ ] **Step 4: Correr** `npx jest src/employees/employees.repository` → PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/employees/employees.repository.ts src/employees/employees.repository.spec.ts
-git commit -m "feat: repositorio Oracle con PKG crear_datos_basicos y mapeo de errores"
+git add src/employees/employee-field.map.ts src/employees/employees.repository.ts src/employees/employees.repository.spec.ts
+git commit -m "feat: Oracle repository driven by EMPLOYEE_FIELD_MAP with PKG create and error mapping"
 ```
 
 ---
@@ -998,10 +1063,10 @@ describe('Employees e2e', () => {
   let app: INestApplication;
   let token: string;
   const repoMock = {
-    create: jest.fn(async (_c, d) => ({ cedula: d.cedula, mensaje: 'OK' })),
-    findById: jest.fn(async () => ({ CEDULA: '12345678' })),
+    create: jest.fn(async (_c, d) => ({ idNumber: d.idNumber, message: 'OK' })),
+    findById: jest.fn(async () => ({ idNumber: '12345678' })),
     findAll: jest.fn(async () => ({ page: 1, size: 20, items: [] })),
-    update: jest.fn(async () => ({ CEDULA: '12345678' })),
+    update: jest.fn(async () => ({ idNumber: '12345678' })),
     softDelete: jest.fn(async () => undefined),
   };
 
@@ -1036,13 +1101,13 @@ describe('Employees e2e', () => {
   it('POST válido → 201', () =>
     request(app.getHttpServer()).post('/api/v1/employees')
       .set('Authorization', `Bearer ${token}`).set('X-Country-Code', 'VE')
-      .send({ cedula: '12345678', nacionalidad: 'V', primerNombre: 'MARIA', primerApellido: 'PEREZ', fechaNacimiento: '1990-05-14', sexo: 'F' })
+      .send({ idNumber: '12345678', nationality: 'V', firstName: 'MARIA', lastName: 'PEREZ', birthDate: '1990-05-14', gender: 'F' })
       .expect(201));
 
   it('POST con body inválido → 400 con errores por campo', async () => {
     const res = await request(app.getHttpServer()).post('/api/v1/employees')
       .set('Authorization', `Bearer ${token}`).set('X-Country-Code', 'VE')
-      .send({ cedula: '' }).expect(400);
+      .send({ idNumber: '' }).expect(400);
     expect(res.body.errors.length).toBeGreaterThan(0);
   });
 
@@ -1249,7 +1314,7 @@ git commit -m "docs: setup GCP, colección Postman y evidencias de integración 
 
 ## Resumen de verificación final
 
-- [ ] `npm run lint && npm test && npm run test:e2e` — todo verde.
+- [ ] `npm run lint && npm test -- --coverage && npm run test:e2e` — todo verde, cobertura ≥ 80% (quality gate SonarQube) y `coverage/lcov.info` generado.
 - [ ] `docker build` OK y `/health` responde en el contenedor.
 - [ ] Deploy en Cloud Run responde `/health` y `/docs` públicos, resto exige JWT.
 - [ ] Flujo completo Postman contra espejo VE documentado.

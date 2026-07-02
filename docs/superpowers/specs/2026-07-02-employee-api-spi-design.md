@@ -31,6 +31,9 @@ Exponer un API RESTful para la gestión de empleados del sistema SPI, iniciando 
 | Driver BD | `oracledb` en thin mode (sin Instant Client) | Thick mode (complica imagen Docker) |
 | Auth | Emisor propio `/auth/token` (client_id/client_secret) firmando RS256, llaves en Secret Manager | IdP externo (no existe uno definido para este caso) |
 | DELETE | Borrado lógico por status | DELETE físico sobre EO_PERSONA (riesgoso en espejo de producción) |
+| Acceso a BD | **PKG-first (estándar FTD):** toda escritura vía procedimientos de `corsox.pkg_management_employee` cuando existan; SQL directo solo como fallback documentado. Lecturas por SELECT a `INFOCENT.EO_PERSONA` | Lógica de negocio duplicada en el API |
+| Idioma | Código, contrato del API, mensajes, commits y Swagger **en inglés**; el mapeo hacia los objetos Oracle en español se hace vía diccionario | Campos del API en español (acopla el contrato al esquema legado) |
+| Mapeo de campos | Diccionario único `EMPLOYEE_FIELD_MAP` (campo API → bind PKG → columna) del que se derivan binds, PL/SQL, UPDATE y mapeo de respuesta. Agregar un atributo = 1 campo DTO + 1 entrada del mapa | Mapeo manual repetido en cada método (propenso a inconsistencias) |
 | Despliegue | Cloud Run + Artifact Registry + Cloud Build + Serverless VPC Access | GKE (sobredimensionado) |
 
 ## 4. Estructura de módulos
@@ -104,7 +107,31 @@ Base path: `/api/v1`. Todos los cuerpos en JSON. Todos excepto los públicos exi
 - **E2E (supertest):** flujo auth → CRUD con repositorio Oracle simulado; códigos de estado y formato de error.
 - **Integración manual/Postman contra BD espejo VE:** colección Postman incluida en el repo; base para el Self QA.
 
-## 11. Observabilidad
+## 11. Contrato del API en inglés y diccionario de mapeo
+
+Campos del recurso Employee (API) y su correspondencia con los objetos Oracle:
+
+| Campo API | Bind PKG (asumido, cierra Task 0) | Columna EO_PERSONA |
+|---|---|---|
+| `idNumber` | `p_cedula` | `CEDULA` |
+| `nationality` | `p_nacionalidad` | `NACIONALIDAD` |
+| `firstName` | `p_primer_nombre` | `PRIMER_NOMBRE` |
+| `middleName` | `p_segundo_nombre` | `SEGUNDO_NOMBRE` |
+| `lastName` | `p_primer_apellido` | `PRIMER_APELLIDO` |
+| `secondLastName` | `p_segundo_apellido` | `SEGUNDO_APELLIDO` |
+| `birthDate` | `p_fecha_nacimiento` | `FECHA_NACIMIENTO` |
+| `gender` | `p_sexo` | `SEXO` |
+
+El diccionario `EMPLOYEE_FIELD_MAP` es la única fuente de verdad de esta tabla: de él se generan los binds del PL/SQL, las cláusulas del UPDATE y el mapeo fila→JSON de respuesta. Agregar un atributo nuevo = agregar el campo al DTO (con su validación) + una entrada al mapa.
+
+## 12. Calidad de código (SonarQube)
+
+- Cobertura con `jest --coverage`, reporte **lcov** (`coverage/lcov.info`) consumido por Sonar.
+- Umbral de cobertura ≥ 80% (configurado en `jest` `coverageThreshold` para fallar el build antes de llegar a Sonar).
+- `sonar-project.properties` en el repo con exclusiones estándar: `**/*.module.ts`, `**/main.ts`, `**/*.dto.ts` (solo declaraciones), `**/dist/**`, `**/test/**` como fuente de tests.
+- El pipeline de Cloud Build corre lint + tests con cobertura antes del build de imagen; el análisis Sonar se engancha en ese paso.
+
+## 13. Observabilidad
 
 - Logging estructurado JSON (nestjs-pino) → Cloud Logging. Cada log incluye `country`, `requestId`, `sub` del token. Nunca loguear datos sensibles del empleado ni secretos.
 - Interceptor de logging de request/response (método, ruta, status, latencia).
