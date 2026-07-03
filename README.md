@@ -47,6 +47,28 @@ Tests y quality gate (SonarQube ≥80%):
 npm run lint && npm test -- --coverage && npm run test:e2e
 ```
 
+## Pruebas locales (modo sin Oracle)
+
+Levanta el servicio con un repositorio en memoria (`FAKE_DB`) y el cifrado de payload activo, sin necesidad de Oracle:
+
+```bash
+# PowerShell
+$env:FAKE_DB="true"; $env:PAYLOAD_ENCRYPTION_KEY="portal-shared-key-2026"; node dist/main.js
+# bash
+FAKE_DB=true PAYLOAD_ENCRYPTION_KEY="portal-shared-key-2026" node dist/main.js
+```
+
+> ⚠️ **Credenciales SOLO para pruebas locales / demo.** No usar en producción. Los secretos reales viven en GCP Secret Manager y nunca se commitean.
+
+| Variable | Valor de prueba | Uso |
+|---|---|---|
+| `clientId` | `hr-integration` | Cliente registrado en el `.env` local |
+| `clientSecret` | `local-secret-2026` | Secreto del cliente para `POST /auth/token` |
+| `PAYLOAD_ENCRYPTION_KEY` / `payloadKey` (Postman) | `portal-shared-key-2026` | Passphrase compartida del cifrado de payload (CryptoJS.AES) |
+| `X-Country-Code` | `VE` | Único país habilitado en la fase 1 |
+
+En Postman, la colección viene pre-cargada con `clientSecret` y `payloadKey` en estos valores (pestaña **Variables** de la colección). El `.env.example` mantiene los campos vacíos a propósito — se completan localmente.
+
 ## Documentación
 
 - SDD: [docs/sdd/](docs/sdd/)

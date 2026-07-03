@@ -5,11 +5,14 @@ Sintaxis bash (Git Bash / Linux / macOS). En PowerShell usar `curl.exe` en lugar
 
 ## Variables
 
+> ⚠️ Credenciales SOLO para pruebas locales / demo (modo `FAKE_DB`). No usar en producción; los secretos reales viven en GCP Secret Manager.
+
 ```bash
 export BASE_URL="http://localhost:8080"        # local
 # export BASE_URL="https://employee-api-spi-<hash>-ue.a.run.app"   # Cloud Run
 export CLIENT_ID="hr-integration"
-export CLIENT_SECRET="<secret>"
+export CLIENT_SECRET="local-secret-2026"       # secreto de prueba local
+export PAYLOAD_KEY="portal-shared-key-2026"    # passphrase de cifrado (= PAYLOAD_ENCRYPTION_KEY del backend)
 ```
 
 ---

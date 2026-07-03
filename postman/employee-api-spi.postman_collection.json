@@ -7,8 +7,8 @@
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080" },
     { "key": "clientId", "value": "hr-integration" },
-    { "key": "clientSecret", "value": "" },
-    { "key": "payloadKey", "value": "" },
+    { "key": "clientSecret", "value": "local-secret-2026" },
+    { "key": "payloadKey", "value": "portal-shared-key-2026" },
     { "key": "token", "value": "" }
   ],
   "item": [
