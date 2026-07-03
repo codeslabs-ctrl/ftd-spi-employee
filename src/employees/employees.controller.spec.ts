@@ -18,13 +18,13 @@ describe('EmployeesController', () => {
     expect(svc.create).toHaveBeenCalledWith('VE', dto);
   });
 
-  it('findOne passes the id', () => {
-    controller.findOne(req, '1');
+  it('search takes the idNumber from the body (not the URL)', () => {
+    controller.search(req, { idNumber: '1' } as any);
     expect(svc.findById).toHaveBeenCalledWith('VE', '1');
   });
 
-  it('findAll passes pagination', () => {
-    controller.findAll(req, { page: 3, size: 50 });
+  it('list passes pagination from the body', () => {
+    controller.list(req, { page: 3, size: 50 } as any);
     expect(svc.findAll).toHaveBeenCalledWith('VE', 3, 50);
   });
 

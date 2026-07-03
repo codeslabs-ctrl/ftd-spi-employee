@@ -87,22 +87,28 @@ Esperado — `201`:
 { "idNumber": "12345678", "message": "TRANSACCION EXITOSA" }
 ```
 
-### 2.2 Consultar por identificación (200)
+### 2.2 Consultar por identificación (POST search, 200)
+
+La cédula va en el body (no en la URL) — estilo Farmatodo P2C.
 
 ```bash
-curl -s "$BASE_URL/api/v1/employees/12345678" \
+curl -s -X POST "$BASE_URL/api/v1/employees/search" \
+  -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Country-Code: VE"
+  -H "X-Country-Code: VE" \
+  -d '{ "idNumber": "12345678" }'
 ```
 
 Esperado — `200` con el empleado en claves inglesas (`idNumber`, `firstName`, `gender: "F"`, ...).
 
-### 2.3 Listado paginado (200)
+### 2.3 Listado paginado (POST list, 200)
 
 ```bash
-curl -s "$BASE_URL/api/v1/employees?page=1&size=20" \
+curl -s -X POST "$BASE_URL/api/v1/employees/list" \
+  -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Country-Code: VE"
+  -H "X-Country-Code: VE" \
+  -d '{ "page": 1, "size": 20 }'
 ```
 
 Esperado — `200`: `{ "page": 1, "size": 20, "items": [...] }`.
@@ -136,31 +142,33 @@ Esperado: `204` (marca `IN_REL_TRAB='N'`, no borra el registro).
 ### 3.1 Sin token (401)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL/api/v1/employees/12345678" \
-  -H "X-Country-Code: VE"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+  -H "Content-Type: application/json" -H "X-Country-Code: VE" \
+  -d '{ "idNumber": "12345678" }'
 ```
 
 ### 3.2 Sin header X-Country-Code (400)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL/api/v1/employees/12345678" \
-  -H "Authorization: Bearer $TOKEN"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{ "idNumber": "12345678" }'
 ```
 
 ### 3.3 País válido pero no habilitado (422)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL/api/v1/employees/12345678" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Country-Code: AR"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -H "X-Country-Code: AR" -d '{ "idNumber": "12345678" }'
 ```
 
 ### 3.4 Header de país mal formado (400)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL/api/v1/employees/12345678" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Country-Code: VEN"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -H "X-Country-Code: VEN" -d '{ "idNumber": "12345678" }'
 ```
 
 ### 3.5 Body inválido (400 con errores por campo)
@@ -182,17 +190,17 @@ Esperado — `400`:
 ### 3.6 Empleado inexistente (404)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL/api/v1/employees/00000000" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Country-Code: VE"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -H "X-Country-Code: VE" -d '{ "idNumber": "00000000" }'
 ```
 
 ### 3.7 Token vencido o firma inválida (401)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL/api/v1/employees/12345678" \
-  -H "Authorization: Bearer eyJinvalido" \
-  -H "X-Country-Code: VE"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer eyJinvalido" \
+  -H "X-Country-Code: VE" -d '{ "idNumber": "12345678" }'
 ```
 
 ---
@@ -262,17 +270,17 @@ Esperado: `400` ("Invalid encrypted payload").
 | 1.1 | Token válido | POST /auth/token | 200 |
 | 1.2 | Credenciales inválidas | POST /auth/token | 401 |
 | 2.1 | Crear empleado | POST /employees | 201 |
-| 2.2 | Consultar por id | GET /employees/{id} | 200 |
-| 2.3 | Listado paginado | GET /employees | 200 |
+| 2.2 | Consultar por id | POST /employees/search | 200 |
+| 2.3 | Listado paginado | POST /employees/list | 200 |
 | 2.4 | Actualizar | PUT /employees/{id} | 200 |
 | 2.5 | Borrado lógico | DELETE /employees/{id} | 204 |
-| 3.1 | Sin token | GET /employees/{id} | 401 |
-| 3.2 | Sin X-Country-Code | GET /employees/{id} | 400 |
-| 3.3 | País no habilitado (AR) | GET /employees/{id} | 422 |
-| 3.4 | País mal formado (VEN) | GET /employees/{id} | 400 |
+| 3.1 | Sin token | POST /employees/search | 401 |
+| 3.2 | Sin X-Country-Code | POST /employees/search | 400 |
+| 3.3 | País no habilitado (AR) | POST /employees/search | 422 |
+| 3.4 | País mal formado (VEN) | POST /employees/search | 400 |
 | 3.5 | Body inválido | POST /employees | 400 |
-| 3.6 | Empleado inexistente | GET /employees/{id} | 404 |
-| 3.7 | Token inválido | GET /employees/{id} | 401 |
+| 3.6 | Empleado inexistente | POST /employees/search | 404 |
+| 3.7 | Token inválido | POST /employees/search | 401 |
 | 4 | Health / readiness | GET /health, /health/ready | 200 |
 | 5.1 | Crear cifrado (RequestJson→ResponseJson) | POST /employees | 201 |
 | 5.2 | Cipher inválido | POST /employees | 400 |

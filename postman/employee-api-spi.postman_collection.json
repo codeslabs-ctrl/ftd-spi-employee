@@ -89,7 +89,7 @@
           }
         },
         {
-          "name": "Get employee by id (200)",
+          "name": "Search employee by id (POST 200)",
           "event": [
             {
               "listen": "test",
@@ -100,16 +100,19 @@
             }
           ],
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/12345678"
+            "url": "{{baseUrl}}/api/v1/employees/search",
+            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" },
+            "description": "Lectura por POST: la cédula (idNumber) va en el body, no en la URL, para no filtrarla en logs. Estilo Farmatodo P2C."
           }
         },
         {
-          "name": "List employees (200)",
+          "name": "List employees (POST 200)",
           "event": [
             {
               "listen": "test",
@@ -120,12 +123,14 @@
             }
           ],
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees?page=1&size=20"
+            "url": "{{baseUrl}}/api/v1/employees/list",
+            "body": { "mode": "raw", "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}" }
           }
         },
         {
@@ -187,9 +192,13 @@
             }
           ],
           "request": {
-            "method": "GET",
-            "header": [{ "key": "X-Country-Code", "value": "VE" }],
-            "url": "{{baseUrl}}/api/v1/employees/12345678"
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Country-Code", "value": "VE" }
+            ],
+            "url": "{{baseUrl}}/api/v1/employees/search",
+            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         },
         {
@@ -204,9 +213,13 @@
             }
           ],
           "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/v1/employees/12345678"
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/employees/search",
+            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         },
         {
@@ -221,12 +234,14 @@
             }
           ],
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "AR" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/12345678"
+            "url": "{{baseUrl}}/api/v1/employees/search",
+            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         },
         {

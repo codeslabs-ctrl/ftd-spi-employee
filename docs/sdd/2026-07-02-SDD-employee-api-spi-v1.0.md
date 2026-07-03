@@ -136,8 +136,8 @@ Obligatorios: `idNumber`, `nationality`, `firstName`, `lastName`, `birthDate`, `
 - `gender` viaja como `M`/`F` en el API; el PKG lo traduce a `SEXO` `'1'`/`'2'` con `DECODE`.
 - Validación por campo con class-validator (longitudes reales de columna: `firstName` ≤17, `middleName` ≤15, etc.) → 400 con detalle. Duplicado → 409. `O_COD` distinto de éxito → 422 con `O_MESSAGE`.
 
-### GET /api/v1/employees/{idNumber}
-Consulta un empleado por identificación sobre `INFOCENT.EO_PERSONA`.
+### POST /api/v1/employees/search
+Consulta un empleado por identificación sobre `INFOCENT.EO_PERSONA`. **Lectura por POST (estándar Farmatodo P2C):** el `idNumber` viaja en el body (cifrable como `RequestJson`), nunca en la URL, para no filtrar la cédula en logs/proxies. Request: `{ "idNumber": "12345678" }`.
 
 **Response sugerida** (200)
 ```json
@@ -154,8 +154,8 @@ Consulta un empleado por identificación sobre `INFOCENT.EO_PERSONA`.
 **Notas**
 - No existe → 404 con formato de error estándar.
 
-### GET /api/v1/employees?page=1&size=20
-Listado paginado.
+### POST /api/v1/employees/list
+Listado paginado. `page`/`size` van en el body. Request: `{ "page": 1, "size": 20 }`.
 
 **Response sugerida** (200)
 ```json

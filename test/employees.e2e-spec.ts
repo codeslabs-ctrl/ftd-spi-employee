@@ -74,21 +74,24 @@ describe('Employees e2e', () => {
 
   it('no token → 401', () =>
     request(app.getHttpServer())
-      .get('/api/v1/employees/1')
+      .post('/api/v1/employees/search')
       .set('X-Country-Code', 'VE')
+      .send({ idNumber: '1' })
       .expect(401));
 
   it('missing X-Country-Code → 400', () =>
     request(app.getHttpServer())
-      .get('/api/v1/employees/1')
+      .post('/api/v1/employees/search')
       .set('Authorization', `Bearer ${token}`)
+      .send({ idNumber: '1' })
       .expect(400));
 
   it('country not enabled → 422', () =>
     request(app.getHttpServer())
-      .get('/api/v1/employees/1')
+      .post('/api/v1/employees/search')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'AR')
+      .send({ idNumber: '1' })
       .expect(422));
 
   it('token not authorized for the requested country → 403', async () => {
@@ -96,9 +99,10 @@ describe('Employees e2e', () => {
       .post('/api/v1/auth/token')
       .send({ client_id: 'co-client', client_secret: 'co-secret' });
     await request(app.getHttpServer())
-      .get('/api/v1/employees/12345678')
+      .post('/api/v1/employees/search')
       .set('Authorization', `Bearer ${coRes.body.access_token}`)
       .set('X-Country-Code', 'VE')
+      .send({ idNumber: '12345678' })
       .expect(403);
   });
 
@@ -134,18 +138,20 @@ describe('Employees e2e', () => {
     });
   });
 
-  it('GET by id → 200', () =>
+  it('POST search (id in body) → 200', () =>
     request(app.getHttpServer())
-      .get('/api/v1/employees/12345678')
+      .post('/api/v1/employees/search')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
+      .send({ idNumber: '12345678' })
       .expect(200));
 
-  it('GET list → 200 with pagination', () =>
+  it('POST list (pagination in body) → 200', () =>
     request(app.getHttpServer())
-      .get('/api/v1/employees?page=1&size=20')
+      .post('/api/v1/employees/list')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
+      .send({ page: 1, size: 20 })
       .expect(200)
       .expect(({ body }) => expect(body).toMatchObject({ page: 1, size: 20 })));
 

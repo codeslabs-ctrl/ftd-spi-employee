@@ -2,17 +2,16 @@ import {
   Body,
   Controller,
   Delete,
-  Get,
   HttpCode,
   Param,
   Post,
   Put,
-  Query,
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { ListEmployeesQuery } from './dto/list-employees.query';
+import { SearchEmployeeDto } from './dto/search-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { EmployeesService } from './employees.service';
 
@@ -30,14 +29,18 @@ export class EmployeesController {
     return this.svc.create(req.countryCode, dto);
   }
 
-  @Get(':id')
-  findOne(@Req() req: TenantRequest, @Param('id') id: string) {
-    return this.svc.findById(req.countryCode, id);
+  // Reads via POST (Farmatodo P2C): the identifier travels in the encrypted body
+  // (RequestJson), never in the URL where it would leak into access logs.
+  @Post('search')
+  @HttpCode(200)
+  search(@Req() req: TenantRequest, @Body() dto: SearchEmployeeDto) {
+    return this.svc.findById(req.countryCode, dto.idNumber);
   }
 
-  @Get()
-  findAll(@Req() req: TenantRequest, @Query() q: ListEmployeesQuery) {
-    return this.svc.findAll(req.countryCode, q.page, q.size);
+  @Post('list')
+  @HttpCode(200)
+  list(@Req() req: TenantRequest, @Body() dto: ListEmployeesQuery) {
+    return this.svc.findAll(req.countryCode, dto.page, dto.size);
   }
 
   @Put(':id')
