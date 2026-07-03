@@ -5,11 +5,26 @@
     "description": "CRUD de empleados SPI multi-tenant.\n\nVariables: {{baseUrl}}, {{clientId}}, {{clientSecret}}, {{payloadKey}}.\nEl token se guarda automáticamente al ejecutar Auth > Get Token.\n\nCifrado de payload (P2C): el folder 'Encrypted (P2C)' usa la librería CryptoJS (integrada en Postman) para cifrar el body en 'RequestJson' y descifrar 'ResponseJson', igual que el front. La llave va en {{payloadKey}} (debe coincidir con PAYLOAD_ENCRYPTION_KEY del backend)."
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "clientId", "value": "hr-integration" },
-    { "key": "clientSecret", "value": "local-secret-2026" },
-    { "key": "payloadKey", "value": "portal-shared-key-2026" },
-    { "key": "token", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "clientId",
+      "value": "hr-integration"
+    },
+    {
+      "key": "clientSecret",
+      "value": "local-secret-2026"
+    },
+    {
+      "key": "payloadKey",
+      "value": "portal-shared-key-2026"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -32,7 +47,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/security/token",
             "body": {
               "mode": "raw",
@@ -46,263 +66,32 @@
             {
               "listen": "test",
               "script": {
-                "exec": ["pm.test('status 401', () => pm.response.to.have.status(401));"],
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ],
                 "type": "text/javascript"
               }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/security/token",
-            "body": { "mode": "raw", "raw": "{\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"wrong\"\n}" }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Employees VE",
-      "item": [
-        {
-          "name": "Create employee (201)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 201', () => pm.response.to.have.status(201));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idNumber\": \"12345678\",\n  \"idType\": \"V\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"middleName\": \"ALEJANDRA\",\n  \"lastName\": \"PEREZ\",\n  \"secondLastName\": \"GOMEZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\",\n  \"maritalStatus\": \"SOLTERA\",\n  \"city\": \"CARACAS\",\n  \"mobile\": \"04141234567\",\n  \"email\": \"maria.perez@mail.com\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Search employee by id (POST 200)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
-            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" },
-            "description": "Lectura por POST: la cédula (idNumber) va en el body, no en la URL, para no filtrarla en logs. Estilo Farmatodo P2C."
-          }
-        },
-        {
-          "name": "List employees (POST 200)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/list",
-            "body": { "mode": "raw", "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}" }
-          }
-        },
-        {
-          "name": "Update employee (POST 200)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/update",
-            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\",\n  \"firstName\": \"MARIA ALEJANDRA\"\n}" },
-            "description": "idNumber en el body (no en la URL). Estilo Farmatodo P2C."
-          }
-        },
-        {
-          "name": "Delete employee (POST 204)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 204', () => pm.response.to.have.status(204));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/delete",
-            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Negative cases",
-      "item": [
-        {
-          "name": "No token (401)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 401', () => pm.response.to.have.status(401));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
-            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
-          }
-        },
-        {
-          "name": "Missing X-Country-Code (400)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
-            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
-          }
-        },
-        {
-          "name": "Country not enabled AR (422)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 422', () => pm.response.to.have.status(422));"],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "AR" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
-            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
-          }
-        },
-        {
-          "name": "Invalid body (400)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('status 400', () => pm.response.to.have.status(400));",
-                  "pm.test('per-field errors', () => pm.expect(pm.response.json().errors.length).to.be.above(0));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
-            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"\"\n}" }
-          }
-        },
-        {
-          "name": "Duplicate create (409/422)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('status 409 or 422', () => pm.expect([409, 422]).to.include(pm.response.code));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
-            ],
-            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"idNumber\": \"12345678\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"lastName\": \"PEREZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\"\n}"
+              "raw": "{\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"wrong\"\n}"
             }
           }
         }
       ]
     },
     {
-      "name": "Encrypted (P2C)",
+      "name": "Employee (P2C, cifrado)",
       "description": "Cifrado de payload con CryptoJS.AES (librería crypto-js, integrada en Postman) igual que el front. Requiere {{payloadKey}} = PAYLOAD_ENCRYPTION_KEY del backend. El pre-request cifra el body en RequestJson; el test descifra ResponseJson.",
       "item": [
         {
@@ -346,19 +135,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": {
               "mode": "urlencoded",
-              "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }]
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "Search employee (encrypted 200)",
+          "name": "Get employee (encrypted 200)",
           "event": [
             {
               "listen": "prerequest",
@@ -388,12 +191,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
-            "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
+            }
           }
         },
         {
@@ -427,12 +247,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/list",
-            "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
+            }
           }
         },
         {
@@ -466,12 +303,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/update",
-            "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
+            }
           }
         },
         {
@@ -501,12 +355,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/delete",
-            "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
+            }
           }
         },
         {
@@ -516,21 +387,215 @@
               "listen": "test",
               "script": {
                 "type": "text/javascript",
-                "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"]
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
               }
             }
           ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "X-Country-Code", "value": "VE" }
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": {
               "mode": "urlencoded",
-              "urlencoded": [{ "key": "RequestJson", "value": "not-a-valid-cipher" }]
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "not-a-valid-cipher"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative cases",
+      "item": [
+        {
+          "name": "No token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idNumber\": \"12345678\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Missing X-Country-Code (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idNumber\": \"12345678\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Country not enabled AR (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "AR"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idNumber\": \"12345678\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Invalid body (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('per-field errors', () => pm.expect(pm.response.json().errors.length).to.be.above(0));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idNumber\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Duplicate create (409/422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 409 or 422', () => pm.expect([409, 422]).to.include(pm.response.code));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idNumber\": \"12345678\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"lastName\": \"PEREZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\"\n}"
             }
           }
         }
