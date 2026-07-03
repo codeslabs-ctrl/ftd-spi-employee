@@ -10,21 +10,21 @@ interface TenantRequest {
   countryCode: string;
 }
 
-// All operations use POST so the identifier (cédula) always travels in the body
-// (encryptable as RequestJson) and never in the URL — Farmatodo P2C standard.
+// Farmatodo route style: verb at the end, all POST. The identifier (cédula)
+// always travels in the body (encryptable) — never in the URL.
 @ApiBearerAuth()
-@Controller('employees')
+@Controller('employee')
 export class EmployeesController {
   constructor(private readonly svc: EmployeesService) {}
 
-  @Post()
+  @Post('create')
   create(@Req() req: TenantRequest, @Body() dto: CreateEmployeeDto) {
     return this.svc.create(req.countryCode, dto);
   }
 
-  @Post('search')
+  @Post('get')
   @HttpCode(200)
-  search(@Req() req: TenantRequest, @Body() dto: SearchEmployeeDto) {
+  get(@Req() req: TenantRequest, @Body() dto: SearchEmployeeDto) {
     return this.svc.findById(req.countryCode, dto.idNumber);
   }
 

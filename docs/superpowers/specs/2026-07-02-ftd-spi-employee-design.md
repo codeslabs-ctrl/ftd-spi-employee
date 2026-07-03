@@ -68,7 +68,7 @@ src/
 
 ## 7. Endpoints
 
-Base path: `/api/v1`. Todos los cuerpos en JSON. Todos excepto los públicos exigen `Authorization: Bearer <jwt>` y `X-Country-Code`.
+Base path: `/ftd-spi-employee/rest`. Todos los cuerpos en JSON. Todos excepto los públicos exigen `Authorization: Bearer <jwt>` y `X-Country-Code`.
 
 | Método | Ruta | Implementación (VE) | Éxito | Errores |
 |---|---|---|---|---|
@@ -82,7 +82,7 @@ Base path: `/api/v1`. Todos los cuerpos en JSON. Todos excepto los públicos exi
 
 **Formato de error estándar:**
 ```json
-{ "statusCode": 400, "message": "Validation failed", "errors": ["cedula must not be empty"], "timestamp": "...", "path": "/api/v1/employees" }
+{ "statusCode": 400, "message": "Validation failed", "errors": ["cedula must not be empty"], "timestamp": "...", "path": "/ftd-spi-employee/rest/employee/create" }
 ```
 
 **Punto abierto (tarea de verificación en el plan):** inspeccionar en la BD espejo la especificación de `corsox.pkg_management_employee` para: (a) firma exacta y parámetros obligatorios de `prc_crear_datos_basicos`, (b) existencia de procedimientos de actualización/eliminación. El contrato de los DTOs se cierra con ese resultado antes de implementar `employees/`.

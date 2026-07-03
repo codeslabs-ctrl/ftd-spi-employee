@@ -18,8 +18,8 @@ describe('EmployeesController', () => {
     expect(svc.create).toHaveBeenCalledWith('VE', dto);
   });
 
-  it('search takes the idNumber from the body (not the URL)', () => {
-    controller.search(req, { idNumber: '1' } as any);
+  it('get takes the idNumber from the body (not the URL)', () => {
+    controller.get(req, { idNumber: '1' } as any);
     expect(svc.findById).toHaveBeenCalledWith('VE', '1');
   });
 

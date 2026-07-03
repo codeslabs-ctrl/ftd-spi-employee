@@ -38,7 +38,7 @@ describe('Employees e2e', () => {
       .compile();
 
     app = mod.createNestApplication();
-    app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
+    app.setGlobalPrefix('ftd-spi-employee/rest', { exclude: ['health', 'health/ready'] });
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -50,7 +50,7 @@ describe('Employees e2e', () => {
     await app.init();
 
     const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/token')
+      .post('/ftd-spi-employee/rest/security/token')
       .send({ client_id: 'test-client', client_secret: 'test-secret' });
     token = res.body.access_token;
   });
@@ -59,7 +59,7 @@ describe('Employees e2e', () => {
 
   it('issues a token with 12h TTL', async () => {
     const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/token')
+      .post('/ftd-spi-employee/rest/security/token')
       .send({ client_id: 'test-client', client_secret: 'test-secret' })
       .expect(200);
     expect(res.body.expires_in).toBe(43200);
@@ -68,27 +68,27 @@ describe('Employees e2e', () => {
 
   it('wrong credentials → 401', () =>
     request(app.getHttpServer())
-      .post('/api/v1/auth/token')
+      .post('/ftd-spi-employee/rest/security/token')
       .send({ client_id: 'test-client', client_secret: 'nope' })
       .expect(401));
 
   it('no token → 401', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees/search')
+      .post('/ftd-spi-employee/rest/employee/get')
       .set('X-Country-Code', 'VE')
       .send({ idNumber: '1' })
       .expect(401));
 
   it('missing X-Country-Code → 400', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees/search')
+      .post('/ftd-spi-employee/rest/employee/get')
       .set('Authorization', `Bearer ${token}`)
       .send({ idNumber: '1' })
       .expect(400));
 
   it('country not enabled → 422', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees/search')
+      .post('/ftd-spi-employee/rest/employee/get')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'AR')
       .send({ idNumber: '1' })
@@ -96,10 +96,10 @@ describe('Employees e2e', () => {
 
   it('token not authorized for the requested country → 403', async () => {
     const coRes = await request(app.getHttpServer())
-      .post('/api/v1/auth/token')
+      .post('/ftd-spi-employee/rest/security/token')
       .send({ client_id: 'co-client', client_secret: 'co-secret' });
     await request(app.getHttpServer())
-      .post('/api/v1/employees/search')
+      .post('/ftd-spi-employee/rest/employee/get')
       .set('Authorization', `Bearer ${coRes.body.access_token}`)
       .set('X-Country-Code', 'VE')
       .send({ idNumber: '12345678' })
@@ -108,7 +108,7 @@ describe('Employees e2e', () => {
 
   it('valid POST → 201', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees')
+      .post('/ftd-spi-employee/rest/employee/create')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .send({
@@ -126,7 +126,7 @@ describe('Employees e2e', () => {
 
   it('invalid POST body → 400 with per-field errors', async () => {
     const res = await request(app.getHttpServer())
-      .post('/api/v1/employees')
+      .post('/ftd-spi-employee/rest/employee/create')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .send({ idNumber: '' })
@@ -134,13 +134,13 @@ describe('Employees e2e', () => {
     expect(res.body.errors.length).toBeGreaterThan(0);
     expect(res.body).toMatchObject({
       statusCode: 400,
-      path: '/api/v1/employees',
+      path: '/ftd-spi-employee/rest/employee/create',
     });
   });
 
   it('POST search (id in body) → 200', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees/search')
+      .post('/ftd-spi-employee/rest/employee/get')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .send({ idNumber: '12345678' })
@@ -148,7 +148,7 @@ describe('Employees e2e', () => {
 
   it('POST list (pagination in body) → 200', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees/list')
+      .post('/ftd-spi-employee/rest/employee/list')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .send({ page: 1, size: 20 })
@@ -157,7 +157,7 @@ describe('Employees e2e', () => {
 
   it('POST update (id in body) → 200', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees/update')
+      .post('/ftd-spi-employee/rest/employee/update')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .send({ idNumber: '12345678', firstName: 'ANA' })
@@ -165,7 +165,7 @@ describe('Employees e2e', () => {
 
   it('POST delete (id in body) → 204', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees/delete')
+      .post('/ftd-spi-employee/rest/employee/delete')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .send({ idNumber: '12345678' })
@@ -196,7 +196,7 @@ describe('Employees e2e', () => {
     expect(cipher.startsWith('U2FsdGVkX1')).toBe(true);
 
     const res = await request(app.getHttpServer())
-      .post('/api/v1/employees')
+      .post('/ftd-spi-employee/rest/employee/create')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .type('form')
@@ -214,7 +214,7 @@ describe('Employees e2e', () => {
 
   it('rejects an invalid encrypted payload with 400', () =>
     request(app.getHttpServer())
-      .post('/api/v1/employees')
+      .post('/ftd-spi-employee/rest/employee/create')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
       .type('form')

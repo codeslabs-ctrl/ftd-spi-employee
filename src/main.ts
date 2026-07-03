@@ -31,7 +31,7 @@ async function bootstrap() {
     });
   }
 
-  app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
+  app.setGlobalPrefix('ftd-spi-employee/rest', { exclude: ['health', 'health/ready'] });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

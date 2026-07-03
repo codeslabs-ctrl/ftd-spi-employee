@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { TokenRequestDto } from './dto/token-request.dto';
 import { Public } from './public.decorator';
 
-@Controller('auth')
+@Controller('security')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 

@@ -23,12 +23,12 @@ Detalle completo en el SDD ([docs/sdd/](docs/sdd/), sección 7-bis) y ejemplos e
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/api/v1/auth/token` | Emite JWT RS256 (client_id/client_secret) |
-| POST | `/api/v1/employees` | Crea empleado (`prc_merge_employee`) |
-| POST | `/api/v1/employees/search` | Consulta por identificación (idNumber en el body, no en la URL) |
-| POST | `/api/v1/employees/list` | Listado paginado (page/size en el body) |
-| POST | `/api/v1/employees/update` | Actualización parcial (idNumber en el body) |
-| POST | `/api/v1/employees/delete` | Borrado lógico `IN_REL_TRAB='N'` (idNumber en el body) |
+| POST | `/ftd-spi-employee/rest/security/token` | Emite JWT RS256 (client_id/client_secret) |
+| POST | `/ftd-spi-employee/rest/employee/create` | Crea empleado (`prc_merge_employee`) |
+| POST | `/ftd-spi-employee/rest/employee/get` | Consulta por identificación (idNumber en el body, no en la URL) |
+| POST | `/ftd-spi-employee/rest/employee/list` | Listado paginado (page/size en el body) |
+| POST | `/ftd-spi-employee/rest/employee/update` | Actualización parcial (idNumber en el body) |
+| POST | `/ftd-spi-employee/rest/employee/delete` | Borrado lógico `IN_REL_TRAB='N'` (idNumber en el body) |
 | GET | `/health` · `/health/ready` | Liveness / readiness (públicos) |
 
 Swagger: `/docs`.
@@ -63,7 +63,7 @@ FAKE_DB=true PAYLOAD_ENCRYPTION_KEY="portal-shared-key-2026" node dist/main.js
 | Variable | Valor de prueba | Uso |
 |---|---|---|
 | `clientId` | `hr-integration` | Cliente registrado en el `.env` local |
-| `clientSecret` | `local-secret-2026` | Secreto del cliente para `POST /auth/token` |
+| `clientSecret` | `local-secret-2026` | Secreto del cliente para `POST /security/token` |
 | `PAYLOAD_ENCRYPTION_KEY` / `payloadKey` (Postman) | `portal-shared-key-2026` | Passphrase compartida del cifrado de payload (CryptoJS.AES) |
 | `X-Country-Code` | `VE` | Único país habilitado en la fase 1 |
 

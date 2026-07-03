@@ -22,7 +22,7 @@ export PAYLOAD_KEY="portal-shared-key-2026"    # passphrase de cifrado (= PAYLOA
 ### 1.1 Obtener token (200)
 
 ```bash
-curl -s -X POST "$BASE_URL/api/v1/auth/token" \
+curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/security/token" \
   -H "Content-Type: application/json" \
   -d '{
     "client_id": "'"$CLIENT_ID"'",
@@ -39,7 +39,7 @@ Respuesta esperada — `200`, `expires_in: 43200` (12 h):
 Guardar el token para el resto de las pruebas:
 
 ```bash
-export TOKEN=$(curl -s -X POST "$BASE_URL/api/v1/auth/token" \
+export TOKEN=$(curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/security/token" \
   -H "Content-Type: application/json" \
   -d '{"client_id":"'"$CLIENT_ID"'","client_secret":"'"$CLIENT_SECRET"'"}' | jq -r .access_token)
 ```
@@ -47,7 +47,7 @@ export TOKEN=$(curl -s -X POST "$BASE_URL/api/v1/auth/token" \
 ### 1.2 Credenciales inválidas (401)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/auth/token" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/security/token" \
   -H "Content-Type: application/json" \
   -d '{"client_id":"'"$CLIENT_ID"'","client_secret":"wrong"}'
 ```
@@ -61,7 +61,7 @@ Esperado: `401`.
 ### 2.1 Crear empleado (201)
 
 ```bash
-curl -s -X POST "$BASE_URL/api/v1/employees" \
+curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/employee/create" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
@@ -95,7 +95,7 @@ Esperado — `201`:
 La cédula va en el body (no en la URL) — estilo Farmatodo P2C.
 
 ```bash
-curl -s -X POST "$BASE_URL/api/v1/employees/search" \
+curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/employee/get" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
@@ -107,7 +107,7 @@ Esperado — `200` con el empleado en claves inglesas (`idNumber`, `firstName`, 
 ### 2.3 Listado paginado (POST list, 200)
 
 ```bash
-curl -s -X POST "$BASE_URL/api/v1/employees/list" \
+curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/employee/list" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
@@ -119,7 +119,7 @@ Esperado — `200`: `{ "page": 1, "size": 20, "items": [...] }`.
 ### 2.4 Actualizar (POST update, 200)
 
 ```bash
-curl -s -X POST "$BASE_URL/api/v1/employees/update" \
+curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/employee/update" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
@@ -131,7 +131,7 @@ Esperado — `200` con el empleado actualizado.
 ### 2.5 Eliminar — borrado lógico (POST delete, 204)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/delete" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/delete" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
@@ -147,7 +147,7 @@ Esperado: `204` (marca `IN_REL_TRAB='N'`, no borra el registro).
 ### 3.1 Sin token (401)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/get" \
   -H "Content-Type: application/json" -H "X-Country-Code: VE" \
   -d '{ "idNumber": "12345678" }'
 ```
@@ -155,7 +155,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/sea
 ### 3.2 Sin header X-Country-Code (400)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/get" \
   -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{ "idNumber": "12345678" }'
 ```
@@ -163,7 +163,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/sea
 ### 3.3 País válido pero no habilitado (422)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/get" \
   -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: AR" -d '{ "idNumber": "12345678" }'
 ```
@@ -171,7 +171,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/sea
 ### 3.4 Header de país mal formado (400)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/get" \
   -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VEN" -d '{ "idNumber": "12345678" }'
 ```
@@ -179,7 +179,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/sea
 ### 3.5 Body inválido (400 con errores por campo)
 
 ```bash
-curl -s -X POST "$BASE_URL/api/v1/employees" \
+curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/employee/create" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
@@ -189,13 +189,13 @@ curl -s -X POST "$BASE_URL/api/v1/employees" \
 Esperado — `400`:
 
 ```json
-{ "statusCode": 400, "message": "Bad Request", "errors": ["idNumber must match ..."], "timestamp": "...", "path": "/api/v1/employees" }
+{ "statusCode": 400, "message": "Bad Request", "errors": ["idNumber must match ..."], "timestamp": "...", "path": "/ftd-spi-employee/rest/employee/create" }
 ```
 
 ### 3.6 Empleado inexistente (404)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/get" \
   -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" -d '{ "idNumber": "00000000" }'
 ```
@@ -203,7 +203,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/sea
 ### 3.7 Token vencido o firma inválida (401)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/search" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/get" \
   -H "Content-Type: application/json" -H "Authorization: Bearer eyJinvalido" \
   -H "X-Country-Code: VE" -d '{ "idNumber": "12345678" }'
 ```
@@ -236,7 +236,7 @@ const data = { idNumber:"12345678", nationality:"VENEZOLANO", firstName:"MARIA",
 process.stdout.write(CryptoJS.AES.encrypt(JSON.stringify(data), process.env.PAYLOAD_KEY).toString());
 ')
 
-curl -s -X POST "$BASE_URL/api/v1/employees" \
+curl -s -X POST "$BASE_URL/ftd-spi-employee/rest/employee/create" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -256,7 +256,7 @@ let d=""; process.stdin.on("data",c=>d+=c).on("end",()=>
 ### 5.2 Cipher inválido (400)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/ftd-spi-employee/rest/employee/create" \
   -H "Authorization: Bearer $TOKEN" -H "X-Country-Code: VE" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   --data-urlencode "RequestJson=not-a-valid-cipher"

@@ -281,7 +281,7 @@ git commit -m "feat: configuración tipada con detección de países por variabl
 import { ArgumentsHost, BadRequestException } from '@nestjs/common';
 import { AllExceptionsFilter } from './http-exception.filter';
 
-function mockHost(path = '/api/v1/employees') {
+function mockHost(path = '/ftd-spi-employee/rest/employee/create') {
   const json = jest.fn(); const status = jest.fn(() => ({ json }));
   return {
     host: { switchToHttp: () => ({ getResponse: () => ({ status }), getRequest: () => ({ url: path }) }) } as unknown as ArgumentsHost,
@@ -296,7 +296,7 @@ describe('AllExceptionsFilter', () => {
     expect(status).toHaveBeenCalledWith(400);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({
       statusCode: 400, message: 'Bad Request', errors: ['cedula must not be empty'],
-      path: '/api/v1/employees', timestamp: expect.any(String),
+      path: '/ftd-spi-employee/rest/employee/create', timestamp: expect.any(String),
     }));
   });
 
@@ -1081,38 +1081,38 @@ describe('Employees e2e', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new AllExceptionsFilter());
     await app.init();
-    const res = await request(app.getHttpServer()).post('/api/v1/auth/token')
+    const res = await request(app.getHttpServer()).post('/ftd-spi-employee/rest/security/token')
       .send({ client_id: 'test-client', client_secret: 'test-secret' });
     token = res.body.access_token;
   });
   afterAll(() => app.close());
 
   it('sin token → 401', () =>
-    request(app.getHttpServer()).get('/api/v1/employees/1').set('X-Country-Code', 'VE').expect(401));
+    request(app.getHttpServer()).get('/ftd-spi-employee/rest/employee/create/1').set('X-Country-Code', 'VE').expect(401));
 
   it('sin X-Country-Code → 400', () =>
-    request(app.getHttpServer()).get('/api/v1/employees/1')
+    request(app.getHttpServer()).get('/ftd-spi-employee/rest/employee/create/1')
       .set('Authorization', `Bearer ${token}`).expect(400));
 
   it('país no habilitado → 422', () =>
-    request(app.getHttpServer()).get('/api/v1/employees/1')
+    request(app.getHttpServer()).get('/ftd-spi-employee/rest/employee/create/1')
       .set('Authorization', `Bearer ${token}`).set('X-Country-Code', 'AR').expect(422));
 
   it('POST válido → 201', () =>
-    request(app.getHttpServer()).post('/api/v1/employees')
+    request(app.getHttpServer()).post('/ftd-spi-employee/rest/employee/create')
       .set('Authorization', `Bearer ${token}`).set('X-Country-Code', 'VE')
       .send({ idNumber: '12345678', nationality: 'V', firstName: 'MARIA', lastName: 'PEREZ', birthDate: '1990-05-14', gender: 'F' })
       .expect(201));
 
   it('POST con body inválido → 400 con errores por campo', async () => {
-    const res = await request(app.getHttpServer()).post('/api/v1/employees')
+    const res = await request(app.getHttpServer()).post('/ftd-spi-employee/rest/employee/create')
       .set('Authorization', `Bearer ${token}`).set('X-Country-Code', 'VE')
       .send({ idNumber: '' }).expect(400);
     expect(res.body.errors.length).toBeGreaterThan(0);
   });
 
   it('DELETE → 204', () =>
-    request(app.getHttpServer()).delete('/api/v1/employees/12345678')
+    request(app.getHttpServer()).delete('/ftd-spi-employee/rest/employee/create/12345678')
       .set('Authorization', `Bearer ${token}`).set('X-Country-Code', 'VE').expect(204));
 });
 ```

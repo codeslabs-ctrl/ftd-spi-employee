@@ -33,7 +33,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{baseUrl}}/api/v1/auth/token",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/security/token",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\"\n}"
@@ -54,7 +54,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{baseUrl}}/api/v1/auth/token",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/security/token",
             "body": { "mode": "raw", "raw": "{\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"wrong\"\n}" }
           }
         }
@@ -81,7 +81,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"idNumber\": \"12345678\",\n  \"idType\": \"V\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"middleName\": \"ALEJANDRA\",\n  \"lastName\": \"PEREZ\",\n  \"secondLastName\": \"GOMEZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\",\n  \"maritalStatus\": \"SOLTERA\",\n  \"city\": \"CARACAS\",\n  \"mobile\": \"04141234567\",\n  \"email\": \"maria.perez@mail.com\"\n}"
@@ -106,7 +106,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/search",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
             "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" },
             "description": "Lectura por POST: la cédula (idNumber) va en el body, no en la URL, para no filtrarla en logs. Estilo Farmatodo P2C."
           }
@@ -129,7 +129,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/list",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/list",
             "body": { "mode": "raw", "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}" }
           }
         },
@@ -151,7 +151,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/update",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/update",
             "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\",\n  \"firstName\": \"MARIA ALEJANDRA\"\n}" },
             "description": "idNumber en el body (no en la URL). Estilo Farmatodo P2C."
           }
@@ -174,7 +174,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/delete",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/delete",
             "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         }
@@ -200,7 +200,7 @@
               { "key": "Content-Type", "value": "application/json" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/search",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
             "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         },
@@ -221,7 +221,7 @@
               { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/search",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
             "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         },
@@ -243,7 +243,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "AR" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/search",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
             "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         },
@@ -268,7 +268,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"\"\n}" }
           }
         },
@@ -292,7 +292,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"idNumber\": \"12345678\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"lastName\": \"PEREZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\"\n}"
@@ -350,7 +350,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": {
               "mode": "urlencoded",
               "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }]
@@ -392,7 +392,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/search",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/get",
             "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
           }
         },
@@ -431,7 +431,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/list",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/list",
             "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
           }
         },
@@ -470,7 +470,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/update",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/update",
             "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
           }
         },
@@ -505,7 +505,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/delete",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/delete",
             "body": { "mode": "urlencoded", "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }] }
           }
         },
@@ -527,7 +527,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees",
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/employee/create",
             "body": {
               "mode": "urlencoded",
               "urlencoded": [{ "key": "RequestJson", "value": "not-a-valid-cipher" }]

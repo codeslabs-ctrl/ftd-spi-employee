@@ -1,7 +1,7 @@
 import { ArgumentsHost, BadRequestException } from '@nestjs/common';
 import { AllExceptionsFilter } from './http-exception.filter';
 
-function mockHost(path = '/api/v1/employees') {
+function mockHost(path = '/ftd-spi-employee/rest/employee/create') {
   const json = jest.fn();
   const status = jest.fn(() => ({ json }));
   const host = {
@@ -26,7 +26,7 @@ describe('AllExceptionsFilter', () => {
         statusCode: 400,
         message: 'Bad Request',
         errors: ['idNumber must not be empty'],
-        path: '/api/v1/employees',
+        path: '/ftd-spi-employee/rest/employee/create',
         timestamp: expect.any(String),
       }),
     );

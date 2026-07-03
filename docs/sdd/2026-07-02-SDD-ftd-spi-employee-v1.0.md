@@ -28,7 +28,7 @@
 | | |
 |---|---|
 | **Objetivo** | API RESTful de empleados SPI con CRUD completo, seguridad JWT y enrutamiento multi-tenant por país |
-| **Incluye** | `POST /auth/token` (emisión JWT RS256 TTL 12h); CRUD `/api/v1/employees` — todas las operaciones por POST (create, search, list, update, delete lógico) con el identificador en el body; middleware `X-Country-Code` (ISO 3166-1 alfa-2); pools Oracle por país (VE activo); despliegue Cloud Run + Cloud Build; Swagger; quality gate SonarQube ≥80% |
+| **Incluye** | `POST /auth/token` (emisión JWT RS256 TTL 12h); CRUD `/ftd-spi-employee/rest/employee/create` — todas las operaciones por POST (create, search, list, update, delete lógico) con el identificador en el body; middleware `X-Country-Code` (ISO 3166-1 alfa-2); pools Oracle por país (VE activo); despliegue Cloud Run + Cloud Build; Swagger; quality gate SonarQube ≥80% |
 | **Fuera de alcance** | Habilitación efectiva de AR/CO (queda por configuración); consulta a `corsox.ftd_ingresos` (sus datos llegan como parámetros obligatorios del request); UI de gestión de clientes del API; sincronización con otros sistemas (SIM, RMS) |
 | **Principio rector** | Un solo servicio multi-tenant, PKG-first contra Oracle, contrato del API en inglés desacoplado del esquema legado mediante diccionario de mapeo |
 
@@ -73,7 +73,7 @@
 
 ## 7. Endpoints de la V1
 
-### POST /api/v1/auth/token
+### POST /ftd-spi-employee/rest/security/token
 Emite el token de acceso del API. Único endpoint público junto a health y docs.
 
 **Request**
@@ -97,7 +97,7 @@ Emite el token de acceso del API. Único endpoint público junto a health y docs
 - Credenciales inválidas → 401. Body incompleto → 400.
 - `expires_in` fijo en 43200 s (12 h) por premisa de seguridad.
 
-### POST /api/v1/employees
+### POST /ftd-spi-employee/rest/employee/create
 Crea los datos básicos del empleado envolviendo `prc_crear_datos_basicos`.
 
 **Request**
@@ -136,7 +136,7 @@ Obligatorios: `idNumber`, `nationality`, `firstName`, `lastName`, `birthDate`, `
 - `gender` viaja como `M`/`F` en el API; el PKG lo traduce a `SEXO` `'1'`/`'2'` con `DECODE`.
 - Validación por campo con class-validator (longitudes reales de columna: `firstName` ≤17, `middleName` ≤15, etc.) → 400 con detalle. Duplicado → 409. `O_COD` distinto de éxito → 422 con `O_MESSAGE`.
 
-### POST /api/v1/employees/search
+### POST /ftd-spi-employee/rest/employee/get
 Consulta un empleado por identificación sobre `INFOCENT.EO_PERSONA`. **Lectura por POST (estándar Farmatodo P2C):** el `idNumber` viaja en el body (cifrable como `RequestJson`), nunca en la URL, para no filtrar la cédula en logs/proxies. Request: `{ "idNumber": "12345678" }`.
 
 **Response sugerida** (200)
@@ -154,7 +154,7 @@ Consulta un empleado por identificación sobre `INFOCENT.EO_PERSONA`. **Lectura 
 **Notas**
 - No existe → 404 con formato de error estándar.
 
-### POST /api/v1/employees/list
+### POST /ftd-spi-employee/rest/employee/list
 Listado paginado. `page`/`size` van en el body. Request: `{ "page": 1, "size": 20 }`.
 
 **Response sugerida** (200)
@@ -169,7 +169,7 @@ Listado paginado. `page`/`size` van en el body. Request: `{ "page": 1, "size": 2
 **Notas**
 - `size` máximo 100. Paginación con `OFFSET/FETCH`.
 
-### POST /api/v1/employees/update
+### POST /ftd-spi-employee/rest/employee/update
 Actualización parcial de datos básicos. `idNumber` (requerido) + campos a actualizar, todo en el body. Request: `{ "idNumber": "12345678", "firstName": "MARIA ALEJANDRA" }`.
 
 **Request**
@@ -185,7 +185,7 @@ Actualización parcial de datos básicos. `idNumber` (requerido) + campos a actu
 - PKG-first: si `pkg_management_employee` expone procedimiento de actualización, se envuelve; fallback: UPDATE controlado. [PENDIENTE: resultado Task 0]
 - Body vacío → 422 "Nothing to update".
 
-### POST /api/v1/employees/delete
+### POST /ftd-spi-employee/rest/employee/delete
 Borrado lógico (`IN_REL_TRAB='N'`). `idNumber` en el body. Request: `{ "idNumber": "12345678" }`. Responde 204 sin body. No existe → 404.
 
 ### GET /health · GET /health/ready
