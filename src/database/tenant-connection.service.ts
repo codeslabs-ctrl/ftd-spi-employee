@@ -19,7 +19,9 @@ export class TenantConnectionService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     // FAKE_DB=true (dev/demo): skip real Oracle pools; the in-memory repository is used instead.
     if (process.env.FAKE_DB === 'true') {
-      this.logger.warn('FAKE_DB=true — skipping Oracle pool creation (in-memory mode)');
+      this.logger.warn(
+        'FAKE_DB=true — skipping Oracle pool creation (in-memory mode)',
+      );
       return;
     }
     const countries: Record<string, CountryDbConfig> =

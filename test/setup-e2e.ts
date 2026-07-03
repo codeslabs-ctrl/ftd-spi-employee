@@ -16,6 +16,12 @@ process.env.API_CLIENTS_JSON = JSON.stringify([
     secretHash: crypto.createHash('sha256').update('test-secret').digest('hex'),
     countries: ['VE'],
   },
+  {
+    // authorized only for CO — used to assert the 403 country-claim enforcement
+    clientId: 'co-client',
+    secretHash: crypto.createHash('sha256').update('co-secret').digest('hex'),
+    countries: ['CO'],
+  },
 ]);
 process.env.DB_VE_CONNECT_STRING = 'dummy:1521/SPI';
 process.env.DB_VE_USER = 'dummy';

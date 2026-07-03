@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { toEmployeePayload } from './employee-field.map';
@@ -19,7 +23,8 @@ export class InMemoryEmployeesRepository {
 
   async create(country: string, dto: CreateEmployeeDto) {
     const k = this.key(country, dto.idNumber);
-    if (this.store.has(k)) throw new ConflictException('Employee already exists');
+    if (this.store.has(k))
+      throw new ConflictException('Employee already exists');
     this.store.set(k, { ...toEmployeePayload(dto), active: 'S' });
     return { idNumber: dto.idNumber, message: 'TRANSACCION EXITOSA' };
   }
@@ -43,7 +48,10 @@ export class InMemoryEmployeesRepository {
 
   async update(country: string, idNumber: string, dto: UpdateEmployeeDto) {
     const emp = await this.findById(country, idNumber);
-    const merged = { ...emp, ...toEmployeePayload({ ...(dto as object), idNumber }) };
+    const merged = {
+      ...emp,
+      ...toEmployeePayload({ ...(dto as object), idNumber }),
+    };
     this.store.set(this.key(country, idNumber), merged);
     return merged;
   }

@@ -11,10 +11,10 @@ export class AuthService {
   issueToken(clientId: string, clientSecret: string) {
     const clients: ApiClient[] = this.config.get('apiClients') ?? [];
     const hash = crypto.createHash('sha256').update(clientSecret).digest('hex');
-    const client = clients.find(
-      (c) => c.clientId === clientId && c.secretHash === hash,
-    );
-    if (!client) throw new UnauthorizedException('Invalid client credentials');
+    const client = clients.find((c) => c.clientId === clientId);
+    if (!client || !this.secretMatches(client.secretHash, hash)) {
+      throw new UnauthorizedException('Invalid client credentials');
+    }
 
     const { privateKey, ttlSeconds, issuer }: AppConfig['jwt'] =
       this.config.get('jwt');
@@ -29,5 +29,12 @@ export class AuthService {
       },
     );
     return { access_token, token_type: 'Bearer', expires_in: ttlSeconds };
+  }
+
+  // Constant-time comparison to avoid leaking the secret via response timing.
+  private secretMatches(stored: string, provided: string): boolean {
+    const a = Buffer.from(stored ?? '', 'utf8');
+    const b = Buffer.from(provided, 'utf8');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
   }
 }

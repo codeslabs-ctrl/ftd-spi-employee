@@ -90,6 +90,17 @@ describe('Employees e2e', () => {
       .set('X-Country-Code', 'AR')
       .expect(422));
 
+  it('token not authorized for the requested country → 403', async () => {
+    const coRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/token')
+      .send({ client_id: 'co-client', client_secret: 'co-secret' });
+    await request(app.getHttpServer())
+      .get('/api/v1/employees/12345678')
+      .set('Authorization', `Bearer ${coRes.body.access_token}`)
+      .set('X-Country-Code', 'VE')
+      .expect(403);
+  });
+
   it('valid POST → 201', () =>
     request(app.getHttpServer())
       .post('/api/v1/employees')
