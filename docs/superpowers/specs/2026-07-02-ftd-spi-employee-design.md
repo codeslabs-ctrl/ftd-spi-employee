@@ -1,4 +1,4 @@
-# Diseño — API de Empleado SPI (employee-api-spi)
+# Diseño — API de Empleado SPI (ftd-spi-employee)
 
 **Fecha:** 2026-07-02
 **Autor:** Carlos Rodríguez / Claude
@@ -51,7 +51,7 @@ src/
 ## 5. Seguridad (JWT RS256, TTL 12h)
 
 - `POST /auth/token` recibe `client_id` + `client_secret`; valida contra clientes registrados en configuración (secretos en GCP Secret Manager); responde `{ access_token, token_type: "Bearer", expires_in: 43200 }`.
-- Claims del token: `sub` (client_id), `iss` (employee-api-spi), `iat`, `exp` (= iat + 12h), `countries` (países autorizados para ese cliente).
+- Claims del token: `sub` (client_id), `iss` (ftd-spi-employee), `iat`, `exp` (= iat + 12h), `countries` (países autorizados para ese cliente).
 - Par de llaves RSA en Secret Manager: privada solo para el servicio emisor; pública para validación.
 - Guard JWT global (`passport-jwt`, algoritmo fijado a RS256 — se rechaza cualquier otro `alg`). Rutas públicas: `/auth/token`, `/health`, `/health/ready`, `/docs`.
 - Token ausente/inválido/vencido → `401` con cuerpo de error estándar.

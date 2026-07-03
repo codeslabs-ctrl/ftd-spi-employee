@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
--- PKG_MANAGEMENT_EMPLOYEE — procedimientos del Employee API SPI
+-- PKG_MANAGEMENT_EMPLOYEE — procedimientos del FTD SPI Employee API
 -- Esquema: CORSOX | BD: SPI (espejo VE)
 -- Contrato estándar FTD: I_JSON CLOB -> O_JSON CLOB / O_COD / O_MESSAGE
 --

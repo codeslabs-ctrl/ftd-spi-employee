@@ -14,7 +14,7 @@ const secretHash = crypto.createHash('sha256').update('s3cret').digest('hex');
 const config = {
   get: (key: string) =>
     key === 'jwt'
-      ? { privateKey, publicKey, ttlSeconds: 43200, issuer: 'employee-api-spi' }
+      ? { privateKey, publicKey, ttlSeconds: 43200, issuer: 'ftd-spi-employee' }
       : [{ clientId: 'hr-app', secretHash, countries: ['VE'] }],
 } as unknown as ConfigService;
 
@@ -27,7 +27,7 @@ describe('AuthService.issueToken', () => {
       algorithms: ['RS256'],
     }) as jwt.JwtPayload;
     expect(decoded.sub).toBe('hr-app');
-    expect(decoded.iss).toBe('employee-api-spi');
+    expect(decoded.iss).toBe('ftd-spi-employee');
     expect(decoded.countries).toEqual(['VE']);
     expect((decoded.exp ?? 0) - (decoded.iat ?? 0)).toBe(43200);
   });

@@ -1,4 +1,4 @@
-# GCP Setup — employee-api-spi
+# GCP Setup — ftd-spi-employee
 
 Prerequisitos de infraestructura para el primer despliegue. Coordinar los valores reales
 (proyecto, región, red, connect string del espejo VE) con infra/redes/DBA.
@@ -52,7 +52,7 @@ gcloud builds submit --config cloudbuild.yaml \
 1. `GET https://<service-url>/health` → 200 `{"status":"ok"}`.
 2. `GET https://<service-url>/health/ready` → 200 con `countries: ["VE"]` (confirma pool Oracle creado).
 3. `GET https://<service-url>/docs` → Swagger UI.
-4. Correr la colección `postman/employee-api-spi.postman_collection.json` con `baseUrl` apuntando al servicio.
+4. Correr la colección `postman/ftd-spi-employee.postman_collection.json` con `baseUrl` apuntando al servicio.
 
 ## Notas de dimensionamiento
 

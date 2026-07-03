@@ -18,14 +18,14 @@ steps:
     args:
       - build
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/employee-api-spi:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA
       - .
 
   - id: push
     name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/employee-api-spi:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA
 
   - id: deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -33,15 +33,15 @@ steps:
     args:
       - run
       - deploy
-      - employee-api-spi
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/employee-api-spi:$SHORT_SHA
+      - ftd-spi-employee
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA
       - --region=${_REGION}
       - --platform=managed
       - --vpc-connector=${_VPC_CONNECTOR}
       - --min-instances=1
       - --concurrency=40
       - --set-secrets=JWT_PRIVATE_KEY_BASE64=jwt-private-key:latest,JWT_PUBLIC_KEY_BASE64=jwt-public-key:latest,DB_VE_PASSWORD=db-ve-password:latest,API_CLIENTS_JSON=api-clients:latest
-      - --set-env-vars=DB_VE_CONNECT_STRING=${_DB_VE_CONNECT_STRING},DB_VE_USER=${_DB_VE_USER},DB_VE_POOL_MIN=1,DB_VE_POOL_MAX=10,JWT_TTL_SECONDS=43200,JWT_ISSUER=employee-api-spi
+      - --set-env-vars=DB_VE_CONNECT_STRING=${_DB_VE_CONNECT_STRING},DB_VE_USER=${_DB_VE_USER},DB_VE_POOL_MIN=1,DB_VE_POOL_MAX=10,JWT_TTL_SECONDS=43200,JWT_ISSUER=ftd-spi-employee
 
 substitutions:
   _REGION: us-east1
@@ -50,4 +50,4 @@ substitutions:
   _DB_VE_USER: ''
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/employee-api-spi:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA

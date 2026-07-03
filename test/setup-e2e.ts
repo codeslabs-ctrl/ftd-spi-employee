@@ -9,7 +9,7 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
 process.env.JWT_PRIVATE_KEY_BASE64 = Buffer.from(privateKey).toString('base64');
 process.env.JWT_PUBLIC_KEY_BASE64 = Buffer.from(publicKey).toString('base64');
 process.env.JWT_TTL_SECONDS = '43200';
-process.env.JWT_ISSUER = 'employee-api-spi';
+process.env.JWT_ISSUER = 'ftd-spi-employee';
 process.env.API_CLIENTS_JSON = JSON.stringify([
   {
     clientId: 'test-client',

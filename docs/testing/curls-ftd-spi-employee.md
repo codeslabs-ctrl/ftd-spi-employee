@@ -1,6 +1,6 @@
-# Employee API SPI — cURLs de prueba
+# FTD SPI Employee API — cURLs de prueba
 
-Equivalentes a la colección `postman/employee-api-spi.postman_collection.json`.
+Equivalentes a la colección `postman/ftd-spi-employee.postman_collection.json`.
 Sintaxis bash (Git Bash / Linux / macOS). En PowerShell usar `curl.exe` en lugar de `curl`.
 
 ## Variables
@@ -9,7 +9,7 @@ Sintaxis bash (Git Bash / Linux / macOS). En PowerShell usar `curl.exe` en lugar
 
 ```bash
 export BASE_URL="http://localhost:8080"        # local
-# export BASE_URL="https://employee-api-spi-<hash>-ue.a.run.app"   # Cloud Run
+# export BASE_URL="https://ftd-spi-employee-<hash>-ue.a.run.app"   # Cloud Run
 export CLIENT_ID="hr-integration"
 export CLIENT_SECRET="local-secret-2026"       # secreto de prueba local
 export PAYLOAD_KEY="portal-shared-key-2026"    # passphrase de cifrado (= PAYLOAD_ENCRYPTION_KEY del backend)

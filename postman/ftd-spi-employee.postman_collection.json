@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Employee API SPI",
+    "name": "FTD SPI Employee API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "description": "CRUD de empleados SPI multi-tenant.\n\nVariables: {{baseUrl}}, {{clientId}}, {{clientSecret}}, {{payloadKey}}.\nEl token se guarda automáticamente al ejecutar Auth > Get Token.\n\nCifrado de payload (P2C): el folder 'Encrypted (P2C)' usa la librería CryptoJS (integrada en Postman) para cifrar el body en 'RequestJson' y descifrar 'ResponseJson', igual que el front. La llave va en {{payloadKey}} (debe coincidir con PAYLOAD_ENCRYPTION_KEY del backend)."
   },

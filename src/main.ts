@@ -49,7 +49,7 @@ async function bootstrap() {
     process.env.NODE_ENV !== 'production';
   if (swaggerEnabled) {
     const swaggerCfg = new DocumentBuilder()
-      .setTitle('Employee API SPI')
+      .setTitle('FTD SPI Employee API')
       .setDescription(
         'Multi-tenant employee API for the SPI system (VE, AR, CO)',
       )

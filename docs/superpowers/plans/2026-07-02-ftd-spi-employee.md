@@ -1,4 +1,4 @@
-# Employee API SPI — Plan de Implementación
+# FTD SPI Employee API — Plan de Implementación
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,8 +8,8 @@
 
 **Tech Stack:** Node 20 LTS, NestJS 10, TypeScript, `oracledb` (thin), `@nestjs/passport` + `passport-jwt` + `jsonwebtoken`, `class-validator`, `@nestjs/swagger`, Jest + supertest, Docker, Cloud Run, Cloud Build, Secret Manager, Serverless VPC Access.
 
-**Spec:** `docs/superpowers/specs/2026-07-02-employee-api-spi-design.md`
-**Raíz del proyecto:** `C:\Users\cerodriguez\Desktop\DOCUMENTACIONES\PERSONALES\employee-api-spi`
+**Spec:** `docs/superpowers/specs/2026-07-02-ftd-spi-employee-design.md`
+**Raíz del proyecto:** `C:\Users\cerodriguez\Desktop\DOCUMENTACIONES\PERSONALES\ftd-spi-employee`
 
 ---
 
@@ -101,8 +101,8 @@ git commit -m "docs: firma real de pkg_management_employee desde BD espejo VE"
 
 ```bash
 cd "C:\Users\cerodriguez\Desktop\DOCUMENTACIONES\PERSONALES"
-npx --yes @nestjs/cli@10 new employee-api-spi --package-manager npm --skip-git
-cd employee-api-spi
+npx --yes @nestjs/cli@10 new ftd-spi-employee --package-manager npm --skip-git
+cd ftd-spi-employee
 git init -b main
 ```
 
@@ -125,7 +125,7 @@ PORT=8080
 JWT_PRIVATE_KEY_BASE64=
 JWT_PUBLIC_KEY_BASE64=
 JWT_TTL_SECONDS=43200
-JWT_ISSUER=employee-api-spi
+JWT_ISSUER=ftd-spi-employee
 
 # Clientes del API (JSON: [{"clientId":"...","secretHash":"..."}])
 API_CLIENTS_JSON=[]
@@ -159,8 +159,8 @@ Expected: build OK, test de ejemplo PASS.
 Crear `sonar-project.properties` en la raíz:
 
 ```properties
-sonar.projectKey=employee-api-spi
-sonar.projectName=Employee API SPI
+sonar.projectKey=ftd-spi-employee
+sonar.projectName=FTD SPI Employee API
 sonar.sources=src
 sonar.tests=src,test
 sonar.test.inclusions=**/*.spec.ts,**/*.e2e-spec.ts
@@ -175,7 +175,7 @@ Verificar: `npm test -- --coverage` genera `coverage/lcov.info`. (El umbral fall
 
 ```bash
 git add -A
-git commit -m "chore: scaffold NestJS employee-api-spi con dependencias base"
+git commit -m "chore: scaffold NestJS ftd-spi-employee con dependencias base"
 ```
 
 ---
@@ -250,7 +250,7 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
       privateKey: Buffer.from(env.JWT_PRIVATE_KEY_BASE64 ?? '', 'base64').toString('utf8'),
       publicKey: Buffer.from(env.JWT_PUBLIC_KEY_BASE64 ?? '', 'base64').toString('utf8'),
       ttlSeconds: Number(env.JWT_TTL_SECONDS ?? 43200),
-      issuer: env.JWT_ISSUER ?? 'employee-api-spi',
+      issuer: env.JWT_ISSUER ?? 'ftd-spi-employee',
     },
     apiClients: JSON.parse(env.API_CLIENTS_JSON ?? '[]'),
   };
@@ -556,7 +556,7 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
 const secretHash = crypto.createHash('sha256').update('s3cret').digest('hex');
 const config = {
   get: (k: string) => k === 'jwt'
-    ? { privateKey, publicKey, ttlSeconds: 43200, issuer: 'employee-api-spi' }
+    ? { privateKey, publicKey, ttlSeconds: 43200, issuer: 'ftd-spi-employee' }
     : [{ clientId: 'rrhh-app', secretHash, countries: ['VE'] }],
 } as any;
 
@@ -567,7 +567,7 @@ describe('AuthService.issueToken', () => {
     expect(res.expires_in).toBe(43200);
     const decoded = jwt.verify(res.access_token, publicKey, { algorithms: ['RS256'] }) as any;
     expect(decoded.sub).toBe('rrhh-app');
-    expect(decoded.iss).toBe('employee-api-spi');
+    expect(decoded.iss).toBe('ftd-spi-employee');
     expect(decoded.countries).toEqual(['VE']);
     expect(decoded.exp - decoded.iat).toBe(43200);
   });
@@ -1173,7 +1173,7 @@ export class HealthController {
 
 ```typescript
 const swaggerCfg = new DocumentBuilder()
-  .setTitle('Employee API SPI').setVersion('1.0')
+  .setTitle('FTD SPI Employee API').setVersion('1.0')
   .addBearerAuth()
   .addGlobalParameters({ name: 'X-Country-Code', in: 'header', required: true, schema: { type: 'string', example: 'VE' } })
   .build();
@@ -1226,14 +1226,14 @@ steps:
     entrypoint: bash
     args: ['-c', 'npm ci && npm run lint && npm test']
   - name: gcr.io/cloud-builders/docker
-    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/employee-api-spi:$SHORT_SHA', '.']
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA', '.']
   - name: gcr.io/cloud-builders/docker
-    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/employee-api-spi:$SHORT_SHA']
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA']
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
-      - run; deploy; employee-api-spi
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/employee-api-spi:$SHORT_SHA
+      - run; deploy; ftd-spi-employee
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA
       - --region=${_REGION}
       - --vpc-connector=${_VPC_CONNECTOR}
       - --min-instances=1
@@ -1246,13 +1246,13 @@ substitutions:
   _DB_VE_USER: ''
 ```
 
-(Nota: en el paso de deploy los `args` van uno por línea — la lista real del YAML usa un item por flag; el `;` de arriba es ilustrativo de items separados `run`, `deploy`, `employee-api-spi`.)
+(Nota: en el paso de deploy los `args` van uno por línea — la lista real del YAML usa un item por flag; el `;` de arriba es ilustrativo de items separados `run`, `deploy`, `ftd-spi-employee`.)
 
 - [ ] **Step 3: Verificar build local de la imagen**
 
 ```bash
-docker build -t employee-api-spi:local .
-docker run --rm -p 8080:8080 --env-file .env employee-api-spi:local
+docker build -t ftd-spi-employee:local .
+docker run --rm -p 8080:8080 --env-file .env ftd-spi-employee:local
 ```
 Expected: contenedor arranca; `curl http://localhost:8080/health` → `{"status":"ok"}`.
 
@@ -1268,7 +1268,7 @@ git commit -m "chore: Dockerfile multi-stage y pipeline Cloud Build para Cloud R
 ### Task 12: Infraestructura GCP y prueba de integración contra BD espejo VE
 
 **Files:**
-- Create: `docs/deploy/gcp-setup.md`, `postman/employee-api-spi.postman_collection.json`
+- Create: `docs/deploy/gcp-setup.md`, `postman/ftd-spi-employee.postman_collection.json`
 
 - [ ] **Step 1: Documentar y ejecutar el setup GCP** en `docs/deploy/gcp-setup.md` (coordinar con infra los valores reales):
 

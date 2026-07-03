@@ -60,7 +60,7 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
         'base64',
       ).toString('utf8'),
       ttlSeconds: Number(env.JWT_TTL_SECONDS ?? 43200),
-      issuer: env.JWT_ISSUER ?? 'employee-api-spi',
+      issuer: env.JWT_ISSUER ?? 'ftd-spi-employee',
     },
     apiClients: JSON.parse(env.API_CLIENTS_JSON ?? '[]') as ApiClient[],
     payloadEncryptionKey: env.PAYLOAD_ENCRYPTION_KEY ?? '',

@@ -9,7 +9,7 @@ const { publicKey } = crypto.generateKeyPairSync('rsa', {
 });
 
 const config = {
-  get: () => ({ publicKey, issuer: 'employee-api-spi' }),
+  get: () => ({ publicKey, issuer: 'ftd-spi-employee' }),
 } as unknown as ConfigService;
 
 describe('JwtStrategy', () => {

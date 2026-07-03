@@ -1,5 +1,5 @@
 # Software Design Document
-## Employee API SPI — API RESTful multi-tenant de empleados
+## FTD SPI Employee API — API RESTful multi-tenant de empleados
 ### Versión 1.0
 
 **Estado:** Análisis y Diseño (aprobado — inicia desarrollo)
@@ -14,14 +14,14 @@
 |---|---|
 | Estado | Análisis y Diseño |
 | Objetivo | Exponer un API RESTful para la gestión de empleados del sistema SPI, multi-tenant por país |
-| Ámbito | Backend — nuevo servicio `employee-api-spi` en GCP Cloud Run |
+| Ámbito | Backend — nuevo servicio `ftd-spi-employee` en GCP Cloud Run |
 | Fecha | 2026-07-02 |
 
 ---
 
 ## 2. Resumen ejecutivo
 
-`employee-api-spi` es un servicio NestJS que expone la gestión de empleados del sistema SPI como API RESTful, iniciando con Venezuela y preparado para Argentina y Colombia sin cambios de código. La V1 prioriza: creación de empleados envolviendo el paquete Oracle existente `corsox.pkg_management_employee` (estándar FTD: PKG-first), consulta sobre `INFOCENT.EO_PERSONA`, seguridad con JWT RS256 (TTL 12h) y aislamiento de datos por región mediante el header `X-Country-Code`. El principio arquitectónico central es un único despliegue multi-tenant en Cloud Run con un connection pool Oracle por país, donde el header de país determina dinámicamente el enrutamiento a la base de datos correspondiente.
+`ftd-spi-employee` es un servicio NestJS que expone la gestión de empleados del sistema SPI como API RESTful, iniciando con Venezuela y preparado para Argentina y Colombia sin cambios de código. La V1 prioriza: creación de empleados envolviendo el paquete Oracle existente `corsox.pkg_management_employee` (estándar FTD: PKG-first), consulta sobre `INFOCENT.EO_PERSONA`, seguridad con JWT RS256 (TTL 12h) y aislamiento de datos por región mediante el header `X-Country-Code`. El principio arquitectónico central es un único despliegue multi-tenant en Cloud Run con un connection pool Oracle por país, donde el header de país determina dinámicamente el enrutamiento a la base de datos correspondiente.
 
 ## 3. Objetivo y alcance
 
@@ -48,7 +48,7 @@
 
 | Componente | Responsabilidad principal | Notas |
 |---|---|---|
-| `employee-api-spi` (Cloud Run) | Exponer el API REST, validar, autenticar y enrutar por país | NestJS 10, Node 20, contenedor `node:20-slim` |
+| `ftd-spi-employee` (Cloud Run) | Exponer el API REST, validar, autenticar y enrutar por país | NestJS 10, Node 20, contenedor `node:20-slim` |
 | Módulo `auth` | Emitir y validar JWT RS256 TTL 12h; guard global | `passport-jwt`; algoritmo fijado a RS256 |
 | Módulo `tenancy` | Validar `X-Country-Code` y resolver el tenant | 400 header inválido; 422 país no habilitado; 403 país no autorizado para el cliente |
 | Módulo `database` | Pools `oracledb` por país (thin mode) | `TenantConnectionService.getPool(cc)`; cierre limpio en shutdown |
@@ -61,7 +61,7 @@
 ## 6. Flujo funcional de inicio a fin
 
 1. El sistema cliente solicita token: `POST /auth/token` con `client_id`/`client_secret`.
-2. `employee-api-spi` valida credenciales contra los clientes registrados (Secret Manager) y responde JWT RS256 con `exp = iat + 12h` y claim `countries`.
+2. `ftd-spi-employee` valida credenciales contra los clientes registrados (Secret Manager) y responde JWT RS256 con `exp = iat + 12h` y claim `countries`.
 3. El cliente invoca un endpoint CRUD con `Authorization: Bearer <jwt>` y `X-Country-Code: VE`.
 4. El guard JWT valida firma RS256, emisor y vigencia (401 si falla).
 5. El middleware de tenancy valida el header (400/422/403 según el caso) y resuelve el pool Oracle de VE.
@@ -218,7 +218,7 @@ Liveness y readiness (incluye países con pool activo). Públicos, para Cloud Ru
 - **Compatibilidad:** el cifrado se activa por presencia de `RequestJson`; los requests en claro siguen funcionando (útil para pruebas internas). Payload cifrado inválido → **400**.
 
 ```
-Front (crypto-js)                 employee-api-spi
+Front (crypto-js)                 ftd-spi-employee
   data → CryptoJS.AES.encrypt ──► RequestJson (cifrado)
                                    └► interceptor descifra → DTO valida → PKG
   CryptoJS.AES.decrypt ◄────────── ResponseJson (cifrado) ◄── interceptor cifra
@@ -228,10 +228,10 @@ Front (crypto-js)                 employee-api-spi
 
 | Flujo | Quién llama | Quién responde | Contrato clave |
 |---|---|---|---|
-| Emisión de token | Sistema cliente (RRHH/integraciones) | `employee-api-spi` | `client_id`/`client_secret` → JWT RS256, `expires_in: 43200` |
-| CRUD empleados | Sistema cliente | `employee-api-spi` | JSON en inglés + headers `Authorization` y `X-Country-Code` |
-| Creación en SPI | `employee-api-spi` (repository) | BD Oracle SPI (`corsox.pkg_management_employee`) | Binds nombrados desde `EMPLOYEE_FIELD_MAP`; OUT: código + mensaje |
-| Consulta en SPI | `employee-api-spi` (repository) | BD Oracle SPI (`INFOCENT.EO_PERSONA`) | SELECT parametrizado; fila → JSON inglés vía diccionario |
+| Emisión de token | Sistema cliente (RRHH/integraciones) | `ftd-spi-employee` | `client_id`/`client_secret` → JWT RS256, `expires_in: 43200` |
+| CRUD empleados | Sistema cliente | `ftd-spi-employee` | JSON en inglés + headers `Authorization` y `X-Country-Code` |
+| Creación en SPI | `ftd-spi-employee` (repository) | BD Oracle SPI (`corsox.pkg_management_employee`) | Binds nombrados desde `EMPLOYEE_FIELD_MAP`; OUT: código + mensaje |
+| Consulta en SPI | `ftd-spi-employee` (repository) | BD Oracle SPI (`INFOCENT.EO_PERSONA`) | SELECT parametrizado; fila → JSON inglés vía diccionario |
 
 ## 9. Modelo de datos mínimo
 
