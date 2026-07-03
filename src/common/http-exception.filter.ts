@@ -27,10 +27,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = body;
       } else {
         const b = body as { error?: string; message?: string | string[] };
-        message =
-          b.error ??
-          (Array.isArray(b.message) ? 'Bad Request' : (b.message ?? message));
-        errors = Array.isArray(b.message) ? b.message : [];
+        if (Array.isArray(b.message)) {
+          // Validation errors: keep the per-field list, use the status label as message.
+          errors = b.message;
+          message = typeof b.error === 'string' ? b.error : 'Bad Request';
+        } else {
+          // Single-message exceptions: preserve the specific message (404, 403,
+          // 422 with the PKG's O_MESSAGE, "Invalid encrypted payload", etc.).
+          message = b.message ?? b.error ?? message;
+        }
       }
     } else {
       this.logger.error(

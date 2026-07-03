@@ -63,6 +63,26 @@ describe('AllExceptionsFilter', () => {
     );
   });
 
+  it('preserves the specific message when NestJS includes an error label (404/403/422)', () => {
+    const { host, json } = mockHost();
+    new AllExceptionsFilter().catch(
+      new (class extends BadRequestException {
+        getResponse() {
+          // real NestJS shape for new NotFoundException('Employee 0 not found')
+          return {
+            statusCode: 404,
+            message: 'Employee 0 not found',
+            error: 'Not Found',
+          };
+        }
+      })(),
+      host,
+    );
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Employee 0 not found', errors: [] }),
+    );
+  });
+
   it('maps unhandled errors to 500 without leaking internals', () => {
     const { host, status, json } = mockHost();
     new AllExceptionsFilter().catch(

@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import * as CryptoJS from 'crypto-js';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
@@ -170,4 +171,46 @@ describe('Employees e2e', () => {
       .expect(200);
     expect(ready.body.countries).toEqual(['VE']);
   });
+
+  it('accepts an encrypted RequestJson and returns an encrypted ResponseJson', async () => {
+    const KEY = 'e2e-shared-key'; // matches setup-e2e PAYLOAD_ENCRYPTION_KEY
+    const employee = {
+      idNumber: '55555555',
+      nationality: 'VENEZOLANO',
+      firstName: 'CARLOS',
+      lastName: 'RODRIGUEZ',
+      birthDate: '1988-03-10',
+      gender: 'M',
+    };
+    const cipher = CryptoJS.AES.encrypt(
+      JSON.stringify(employee),
+      KEY,
+    ).toString();
+    expect(cipher.startsWith('U2FsdGVkX1')).toBe(true);
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/employees')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Country-Code', 'VE')
+      .type('form')
+      .send({ RequestJson: cipher })
+      .expect(201);
+
+    expect(res.body.ResponseJson).toBeDefined();
+    const clear = JSON.parse(
+      CryptoJS.AES.decrypt(res.body.ResponseJson, KEY).toString(
+        CryptoJS.enc.Utf8,
+      ),
+    );
+    expect(clear).toEqual({ idNumber: '55555555', message: 'OK' });
+  });
+
+  it('rejects an invalid encrypted payload with 400', () =>
+    request(app.getHttpServer())
+      .post('/api/v1/employees')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Country-Code', 'VE')
+      .type('form')
+      .send({ RequestJson: 'not-a-valid-cipher' })
+      .expect(400));
 });

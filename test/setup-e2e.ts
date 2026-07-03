@@ -26,3 +26,4 @@ process.env.API_CLIENTS_JSON = JSON.stringify([
 process.env.DB_VE_CONNECT_STRING = 'dummy:1521/SPI';
 process.env.DB_VE_USER = 'dummy';
 process.env.DB_VE_PASSWORD = 'dummy';
+process.env.PAYLOAD_ENCRYPTION_KEY = 'e2e-shared-key';

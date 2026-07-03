@@ -1,4 +1,5 @@
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -7,6 +8,7 @@ import { AllExceptionsFilter } from './common/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const config = app.get(ConfigService);
 
   // Security headers. TLS is terminated at Cloud Run; HSTS instructs clients to
   // always use HTTPS. NOTE: this service must ALWAYS run behind TLS — never expose
@@ -16,6 +18,18 @@ async function bootstrap() {
       hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
     }),
   );
+
+  // CORS: only the configured browser origins (e.g. https://mi-portal.farmatodo.com).
+  const corsOrigins = config.get<string[]>('corsOrigins') ?? [];
+  if (corsOrigins.length) {
+    app.enableCors({
+      origin: corsOrigins,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Country-Code'],
+      maxAge: 3600,
+    });
+  }
 
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/ready'] });
   app.useGlobalPipes(

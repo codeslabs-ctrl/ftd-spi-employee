@@ -25,6 +25,10 @@ export interface AppConfig {
     issuer: string;
   };
   apiClients: ApiClient[];
+  // Shared passphrase for CryptoJS.AES payload encryption (front <-> back). Empty = disabled.
+  payloadEncryptionKey: string;
+  // Allowed browser origins for CORS (empty = CORS disabled).
+  corsOrigins: string[];
 }
 
 export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -59,6 +63,11 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
       issuer: env.JWT_ISSUER ?? 'employee-api-spi',
     },
     apiClients: JSON.parse(env.API_CLIENTS_JSON ?? '[]') as ApiClient[],
+    payloadEncryptionKey: env.PAYLOAD_ENCRYPTION_KEY ?? '',
+    corsOrigins: (env.CORS_ORIGINS ?? '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
   };
 }
 
