@@ -206,6 +206,55 @@ curl -s "$BASE_URL/health/ready"    # {"status":"ok","countries":["VE"]}
 
 ---
 
+## 5. Payload cifrado (P2C) — librería `crypto-js`
+
+Cuando `PAYLOAD_ENCRYPTION_KEY` está configurada en el backend, el body viaja cifrado con **CryptoJS.AES** (librería **`crypto-js`**, la misma del front): el cliente envía el campo `RequestJson` cifrado y recibe `ResponseJson` cifrado.
+
+```bash
+export PAYLOAD_KEY="portal-shared-key-2026"   # = PAYLOAD_ENCRYPTION_KEY del backend
+```
+
+### 5.1 Crear empleado cifrado (201)
+
+```bash
+CIPHER=$(node -e '
+const CryptoJS = require("crypto-js");
+const data = { idNumber:"12345678", nationality:"VENEZOLANO", firstName:"MARIA", lastName:"PEREZ", birthDate:"1990-05-14", gender:"F" };
+process.stdout.write(CryptoJS.AES.encrypt(JSON.stringify(data), process.env.PAYLOAD_KEY).toString());
+')
+
+curl -s -X POST "$BASE_URL/api/v1/employees" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Country-Code: VE" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "RequestJson=$CIPHER"
+```
+
+Respuesta — `201`, cifrada: `{ "ResponseJson": "U2FsdGVkX1+..." }`. Descifrarla:
+
+```bash
+echo '<ResponseJson>' | node -e '
+const CryptoJS = require("crypto-js");
+let d=""; process.stdin.on("data",c=>d+=c).on("end",()=>
+  console.log(CryptoJS.AES.decrypt(d.trim(), process.env.PAYLOAD_KEY).toString(CryptoJS.enc.Utf8)));'
+# -> {"idNumber":"12345678","message":"TRANSACCION EXITOSA"}
+```
+
+### 5.2 Cipher inválido (400)
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees" \
+  -H "Authorization: Bearer $TOKEN" -H "X-Country-Code: VE" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "RequestJson=not-a-valid-cipher"
+```
+
+Esperado: `400` ("Invalid encrypted payload").
+
+> En **Postman**, el folder *Encrypted (P2C)* trae los scripts que cifran/descifran automáticamente con la variable `{{payloadKey}}` (CryptoJS viene integrado en Postman).
+
+---
+
 ## Matriz de resultados esperados
 
 | # | Caso | Método | Código |
@@ -225,3 +274,5 @@ curl -s "$BASE_URL/health/ready"    # {"status":"ok","countries":["VE"]}
 | 3.6 | Empleado inexistente | GET /employees/{id} | 404 |
 | 3.7 | Token inválido | GET /employees/{id} | 401 |
 | 4 | Health / readiness | GET /health, /health/ready | 200 |
+| 5.1 | Crear cifrado (RequestJson→ResponseJson) | POST /employees | 201 |
+| 5.2 | Cipher inválido | POST /employees | 400 |

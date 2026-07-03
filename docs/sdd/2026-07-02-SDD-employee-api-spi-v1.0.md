@@ -37,9 +37,11 @@
 - **PKG-first (estándar FTD):** toda la operación pasa por procedimientos de `corsox.pkg_management_employee` con el contrato estándar FTD `I_JSON CLOB → O_JSON CLOB / O_COD / O_MESSAGE`: los GET devuelven JSON con `JSON_ARRAYAGG/JSON_OBJECT` y las escrituras hacen `MERGE` parseando `I_JSON` con `JSON_TABLE`. Los códigos de respuesta usan `UTILITY.PKG_GLOBAL_CONSTANTS`. La lógica de negocio permanece en la BD.
 - **Multi-tenant en un solo despliegue:** un pool `oracledb` por país creado al bootstrap; `X-Country-Code` resuelve el pool por request. Habilitar un país nuevo = agregar variables `DB_<CC>_*`, sin código.
 - **Contrato en inglés, esquema en español:** el diccionario `EMPLOYEE_FIELD_MAP` (campo API → bind PKG → columna) es la única fuente de verdad; de él se generan binds, PL/SQL, UPDATE y mapeo de respuesta. Agregar un atributo = 1 campo DTO + 1 entrada del mapa.
-- **Seguridad autocontenida:** el propio servicio emite JWT RS256 (llaves en Secret Manager) con TTL de 12 horas y claim `countries` que restringe qué países puede usar cada cliente.
+- **Seguridad autocontenida:** el propio servicio emite JWT RS256 (llaves en Secret Manager) con TTL de 12 horas y claim `countries` que un guard valida contra `X-Country-Code` (403 si el cliente no está autorizado para el país).
+- **Cifrado de payload front↔back (P2C):** el body viaja cifrado con **CryptoJS.AES** (librería `crypto-js`, formato OpenSSL "Salted__"). El front envía el campo `RequestJson` cifrado y recibe `ResponseJson` cifrado, con una passphrase compartida en Secret Manager (`PAYLOAD_ENCRYPTION_KEY`). Un interceptor descifra antes de la validación y cifra la respuesta.
+- **Defensa en profundidad:** `helmet` + HSTS, rate limiting (`@nestjs/throttler`: 60/min global, 10/min en `/auth/token`), CORS restringido por origen (`CORS_ORIGINS`), comparación de secreto en tiempo constante, y Swagger deshabilitado en producción.
 - **Serverless nativo GCP:** Cloud Run con escalado automático; conectividad a la BD SPI vía Serverless VPC Access; secretos en Secret Manager; CI/CD en Cloud Build.
-- **DELETE lógico:** nunca borrado físico sobre `EO_PERSONA` (BD espejo de producción).
+- **DELETE lógico:** nunca borrado físico sobre `EO_PERSONA` (BD espejo de producción); se marca `IN_REL_TRAB='N'`.
 - **Calidad verificable:** TDD, cobertura ≥80% (lcov) como quality gate de SonarQube antes del build de imagen.
 
 ## 5. Arquitectura objetivo y responsabilidades
@@ -50,7 +52,8 @@
 | Módulo `auth` | Emitir y validar JWT RS256 TTL 12h; guard global | `passport-jwt`; algoritmo fijado a RS256 |
 | Módulo `tenancy` | Validar `X-Country-Code` y resolver el tenant | 400 header inválido; 422 país no habilitado; 403 país no autorizado para el cliente |
 | Módulo `database` | Pools `oracledb` por país (thin mode) | `TenantConnectionService.getPool(cc)`; cierre limpio en shutdown |
-| Módulo `employees` | CRUD: controller → service → repository | Repository genera PL/SQL y binds desde `EMPLOYEE_FIELD_MAP` |
+| Módulo `employees` | CRUD: controller → service → repository | Repository arma `I_JSON` y consume `O_JSON/O_COD/O_MESSAGE` |
+| Módulo `crypto` | Descifrar `RequestJson` / cifrar `ResponseJson` (CryptoJS.AES) | `CryptoService` + `PayloadCryptoInterceptor` (librería `crypto-js`) |
 | BD SPI VE (espejo) | Lógica de negocio de creación (`pkg_management_employee`) y datos (`INFOCENT.EO_PERSONA`) | Esquema `corsox`; acceso vía VPC connector |
 | Secret Manager | Llaves RSA, credenciales Oracle por país, clientes del API | Montados como env vars en Cloud Run |
 | Cloud Build | Pipeline: lint → tests+cobertura → build → push → deploy | Gate SonarQube en el paso de tests |
@@ -188,6 +191,39 @@ Borrado lógico (status inactivo). Responde 204 sin body. No existe → 404.
 ### GET /health · GET /health/ready
 Liveness y readiness (incluye países con pool activo). Públicos, para Cloud Run.
 
+## 7-bis. Seguridad y cifrado de payload
+
+**Controles aplicados (defensa en profundidad):**
+
+| Control | Implementación |
+|---|---|
+| Autenticación | JWT **RS256**, algoritmo fijado, TTL 12h; llaves en Secret Manager |
+| Autorización por país | Guard valida el claim `countries` del token vs `X-Country-Code` → **403** si no autorizado |
+| Cifrado en tránsito | TLS terminado en Cloud Run + **HSTS** (`helmet`). El servicio siempre va detrás de TLS |
+| Cifrado de payload (P2C) | **CryptoJS.AES** (`crypto-js`) — ver detalle abajo |
+| Rate limiting | `@nestjs/throttler`: 60 req/min global, **10 req/min** en `/auth/token` (429) |
+| CORS | Allowlist por `CORS_ORIGINS` (ej. `https://mi-portal.farmatodo.com`), `credentials: true` |
+| Cabeceras | `helmet` (HSTS, `X-Content-Type-Options`, `X-Frame-Options`, etc.) |
+| Credenciales de cliente | Hash SHA-256, comparación en **tiempo constante** (`crypto.timingSafeEqual`) |
+| Superficie | Swagger `/docs` deshabilitado en producción (salvo `SWAGGER_ENABLED=true`) |
+| Validación | `class-validator` con `whitelist`/`forbidNonWhitelisted` (sin mass-assignment) |
+| SQL injection | El PKG parametriza con `JSON_TABLE`; el API nunca concatena SQL |
+
+**Cifrado de payload (compatible con el front Farmatodo):**
+
+- Librería: **`crypto-js`** (misma que usa el portal), esquema `CryptoJS.AES.encrypt(JSON.stringify(data), KEY)` → base64 con prefijo `Salted__` (formato OpenSSL, AES-CBC + KDF por passphrase).
+- **Request:** el front envía el campo **`RequestJson`** (form-urlencoded o JSON) con el body cifrado. El `PayloadCryptoInterceptor` lo descifra **antes** de la validación, así los DTOs operan sobre el JSON en claro.
+- **Response:** cuando el request llegó cifrado, la respuesta se devuelve como **`ResponseJson`** cifrado con la misma passphrase.
+- **Llave:** passphrase compartida en `PAYLOAD_ENCRYPTION_KEY` (Secret Manager). Vacía = cifrado deshabilitado.
+- **Compatibilidad:** el cifrado se activa por presencia de `RequestJson`; los requests en claro siguen funcionando (útil para pruebas internas). Payload cifrado inválido → **400**.
+
+```
+Front (crypto-js)                 employee-api-spi
+  data → CryptoJS.AES.encrypt ──► RequestJson (cifrado)
+                                   └► interceptor descifra → DTO valida → PKG
+  CryptoJS.AES.decrypt ◄────────── ResponseJson (cifrado) ◄── interceptor cifra
+```
+
 ## 8. Contratos propuestos
 
 | Flujo | Quién llama | Quién responde | Contrato clave |
@@ -257,6 +293,22 @@ No aplica en V1: todos los flujos son síncronos request/response. Los pools de 
 | Fuga de secretos (llaves RSA, credenciales Oracle) | Acceso indebido a datos de empleados | Secret Manager exclusivamente; nunca en repo ni logs; rotación de llaves documentada |
 | TTL de 12 h del token comprometido | Ventana amplia de uso indebido | Claim `countries` limita alcance por cliente; revocación por rotación de llaves; logging con `sub` para auditoría |
 
-## 13. Conclusión
+## 13. Stack y librerías
 
-La V1 construye un servicio NestJS multi-tenant que expone el CRUD de empleados del SPI cumpliendo las cinco premisas: nube nativa GCP (Cloud Run), JWT RS256 con TTL de 12 horas, aislamiento por país vía `X-Country-Code`, diseño REST estricto y creación vía el paquete estándar del esquema `corsox`. La separación de responsabilidades clave es: la lógica de negocio permanece en los paquetes Oracle (PKG-first), el servicio aporta el contrato REST en inglés, la seguridad y el enrutamiento multi-tenant, y el diccionario `EMPLOYEE_FIELD_MAP` desacopla ambos mundos. La evolución recomendada es habilitar AR/CO por configuración una vez existan sus BD espejo, y evaluar carga por lotes asíncrona si el volumen de ingresos lo demanda.
+| Propósito | Librería / Tecnología |
+|---|---|
+| Runtime / framework | Node 20 LTS · NestJS 10 · TypeScript |
+| Oracle | `oracledb` (thin mode) |
+| Autenticación JWT | `@nestjs/passport` · `passport-jwt` · `jsonwebtoken` (RS256) |
+| **Cifrado de payload** | **`crypto-js`** (CryptoJS.AES, compatible con el front) |
+| Rate limiting | `@nestjs/throttler` |
+| Cabeceras de seguridad | `helmet` |
+| Validación | `class-validator` · `class-transformer` |
+| Documentación API | `@nestjs/swagger` (OpenAPI) |
+| Configuración | `@nestjs/config` |
+| Pruebas | `jest` · `supertest` (cobertura lcov ≥80% → SonarQube) |
+| Contenedor / CI-CD | Docker (`node:20-slim`) · Cloud Build · Cloud Run · Artifact Registry · Secret Manager |
+
+## 14. Conclusión
+
+La V1 construye un servicio NestJS multi-tenant que expone el CRUD de empleados del SPI cumpliendo las cinco premisas: nube nativa GCP (Cloud Run), JWT RS256 con TTL de 12 horas, aislamiento por país vía `X-Country-Code`, diseño REST estricto y operación vía el paquete estándar del esquema `corsox`. Además incorpora el estándar de seguridad de Farmatodo: **cifrado de payload front↔back con `crypto-js` (CryptoJS.AES)**, rate limiting, HSTS, CORS restringido y autorización por país. La separación de responsabilidades clave es: la lógica de negocio permanece en los paquetes Oracle (PKG-first), el servicio aporta el contrato REST en inglés, la seguridad, el cifrado y el enrutamiento multi-tenant. La evolución recomendada es habilitar AR/CO por configuración una vez existan sus BD espejo, y evaluar carga por lotes asíncrona si el volumen de ingresos lo demanda.

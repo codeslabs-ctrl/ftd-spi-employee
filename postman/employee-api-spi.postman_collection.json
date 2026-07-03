@@ -2,12 +2,13 @@
   "info": {
     "name": "Employee API SPI",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "CRUD de empleados SPI multi-tenant. Variables: {{baseUrl}}, {{clientId}}, {{clientSecret}}. El token se guarda automáticamente al ejecutar Auth > Get Token."
+    "description": "CRUD de empleados SPI multi-tenant.\n\nVariables: {{baseUrl}}, {{clientId}}, {{clientSecret}}, {{payloadKey}}.\nEl token se guarda automáticamente al ejecutar Auth > Get Token.\n\nCifrado de payload (P2C): el folder 'Encrypted (P2C)' usa la librería CryptoJS (integrada en Postman) para cifrar el body en 'RequestJson' y descifrar 'ResponseJson', igual que el front. La llave va en {{payloadKey}} (debe coincidir con PAYLOAD_ENCRYPTION_KEY del backend)."
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080" },
     { "key": "clientId", "value": "hr-integration" },
     { "key": "clientSecret", "value": "" },
+    { "key": "payloadKey", "value": "" },
     { "key": "token", "value": "" }
   ],
   "item": [
@@ -277,6 +278,89 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"idNumber\": \"12345678\",\n  \"nationality\": \"VENEZOLANO\",\n  \"firstName\": \"MARIA\",\n  \"lastName\": \"PEREZ\",\n  \"birthDate\": \"1990-05-14\",\n  \"gender\": \"F\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Encrypted (P2C)",
+      "description": "Cifrado de payload con CryptoJS.AES (librería crypto-js, integrada en Postman) igual que el front. Requiere {{payloadKey}} = PAYLOAD_ENCRYPTION_KEY del backend. El pre-request cifra el body en RequestJson; el test descifra ResponseJson.",
+      "item": [
+        {
+          "name": "Create employee (encrypted 201)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const employee = {",
+                  "  idNumber: '12345678', idType: 'V', nationality: 'VENEZOLANO',",
+                  "  firstName: 'MARIA', middleName: 'ALEJANDRA', lastName: 'PEREZ', secondLastName: 'GOMEZ',",
+                  "  birthDate: '1990-05-14', gender: 'F', maritalStatus: 'SOLTERA',",
+                  "  city: 'CARACAS', mobile: '04141234567', email: 'maria.perez@mail.com'",
+                  "};",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(employee), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('idNumber correcto tras descifrar', () => pm.expect(clear.idNumber).to.eql('12345678'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Country-Code", "value": "VE" }
+            ],
+            "url": "{{baseUrl}}/api/v1/employees",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [{ "key": "RequestJson", "value": "{{encRequest}}" }]
+            }
+          }
+        },
+        {
+          "name": "Invalid cipher (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Country-Code", "value": "VE" }
+            ],
+            "url": "{{baseUrl}}/api/v1/employees",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [{ "key": "RequestJson", "value": "not-a-valid-cipher" }]
             }
           }
         }
