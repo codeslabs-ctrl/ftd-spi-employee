@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  HttpCode,
-  Param,
-  Post,
-  Put,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { ListEmployeesQuery } from './dto/list-employees.query';
@@ -19,6 +10,8 @@ interface TenantRequest {
   countryCode: string;
 }
 
+// All operations use POST so the identifier (cédula) always travels in the body
+// (encryptable as RequestJson) and never in the URL — Farmatodo P2C standard.
 @ApiBearerAuth()
 @Controller('employees')
 export class EmployeesController {
@@ -29,8 +22,6 @@ export class EmployeesController {
     return this.svc.create(req.countryCode, dto);
   }
 
-  // Reads via POST (Farmatodo P2C): the identifier travels in the encrypted body
-  // (RequestJson), never in the URL where it would leak into access logs.
   @Post('search')
   @HttpCode(200)
   search(@Req() req: TenantRequest, @Body() dto: SearchEmployeeDto) {
@@ -43,18 +34,15 @@ export class EmployeesController {
     return this.svc.findAll(req.countryCode, dto.page, dto.size);
   }
 
-  @Put(':id')
-  update(
-    @Req() req: TenantRequest,
-    @Param('id') id: string,
-    @Body() dto: UpdateEmployeeDto,
-  ) {
-    return this.svc.update(req.countryCode, id, dto);
+  @Post('update')
+  @HttpCode(200)
+  update(@Req() req: TenantRequest, @Body() dto: UpdateEmployeeDto) {
+    return this.svc.update(req.countryCode, dto.idNumber, dto);
   }
 
-  @Delete(':id')
+  @Post('delete')
   @HttpCode(204)
-  remove(@Req() req: TenantRequest, @Param('id') id: string) {
-    return this.svc.remove(req.countryCode, id);
+  remove(@Req() req: TenantRequest, @Body() dto: SearchEmployeeDto) {
+    return this.svc.remove(req.countryCode, dto.idNumber);
   }
 }

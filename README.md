@@ -15,7 +15,7 @@ El body puede viajar cifrado (estándar P2C de Farmatodo), usando la librería *
 - El servicio descifra antes de validar y responde **`ResponseJson`** cifrado con la misma passphrase.
 - Passphrase compartida en `PAYLOAD_ENCRYPTION_KEY` (Secret Manager). Vacía = cifrado deshabilitado; los requests en claro siguen funcionando.
 - Orígenes de navegador permitidos en `CORS_ORIGINS`.
-- **Lecturas por POST:** las consultas usan `POST /employees/search` y `/list` (identificador en el body cifrado), para que la cédula nunca viaje en la URL ni quede en logs.
+- **Sin cédula en la URL:** todas las operaciones (search/list/update/delete) usan POST con el identificador en el body (cifrable), para que la cédula nunca viaje en la URL ni quede en logs.
 
 Detalle completo en el SDD ([docs/sdd/](docs/sdd/), sección 7-bis) y ejemplos en [docs/testing/](docs/testing/) y la colección Postman (folder *Encrypted (P2C)*).
 
@@ -27,8 +27,8 @@ Detalle completo en el SDD ([docs/sdd/](docs/sdd/), sección 7-bis) y ejemplos e
 | POST | `/api/v1/employees` | Crea empleado (`prc_merge_employee`) |
 | POST | `/api/v1/employees/search` | Consulta por identificación (idNumber en el body, no en la URL) |
 | POST | `/api/v1/employees/list` | Listado paginado (page/size en el body) |
-| PUT | `/api/v1/employees/:id` | Actualización parcial |
-| DELETE | `/api/v1/employees/:id` | Borrado lógico (`IN_REL_TRAB='N'`) |
+| POST | `/api/v1/employees/update` | Actualización parcial (idNumber en el body) |
+| POST | `/api/v1/employees/delete` | Borrado lógico `IN_REL_TRAB='N'` (idNumber en el body) |
 | GET | `/health` · `/health/ready` | Liveness / readiness (públicos) |
 
 Swagger: `/docs`.

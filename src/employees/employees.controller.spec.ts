@@ -28,13 +28,14 @@ describe('EmployeesController', () => {
     expect(svc.findAll).toHaveBeenCalledWith('VE', 3, 50);
   });
 
-  it('update passes id and body', () => {
-    controller.update(req, '1', dto);
-    expect(svc.update).toHaveBeenCalledWith('VE', '1', dto);
+  it('update takes idNumber from the body', () => {
+    const body = { idNumber: '1', firstName: 'ANA' } as any;
+    controller.update(req, body);
+    expect(svc.update).toHaveBeenCalledWith('VE', '1', body);
   });
 
-  it('remove passes the id', () => {
-    controller.remove(req, '1');
+  it('remove takes idNumber from the body (not the URL)', () => {
+    controller.remove(req, { idNumber: '1' } as any);
     expect(svc.remove).toHaveBeenCalledWith('VE', '1');
   });
 });

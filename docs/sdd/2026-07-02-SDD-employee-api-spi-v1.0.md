@@ -28,7 +28,7 @@
 | | |
 |---|---|
 | **Objetivo** | API RESTful de empleados SPI con CRUD completo, seguridad JWT y enrutamiento multi-tenant por país |
-| **Incluye** | `POST /auth/token` (emisión JWT RS256 TTL 12h); CRUD `/api/v1/employees` (POST vía PKG, GET por id, GET paginado, PUT, DELETE lógico); middleware `X-Country-Code` (ISO 3166-1 alfa-2); pools Oracle por país (VE activo); despliegue Cloud Run + Cloud Build; Swagger; quality gate SonarQube ≥80% |
+| **Incluye** | `POST /auth/token` (emisión JWT RS256 TTL 12h); CRUD `/api/v1/employees` — todas las operaciones por POST (create, search, list, update, delete lógico) con el identificador en el body; middleware `X-Country-Code` (ISO 3166-1 alfa-2); pools Oracle por país (VE activo); despliegue Cloud Run + Cloud Build; Swagger; quality gate SonarQube ≥80% |
 | **Fuera de alcance** | Habilitación efectiva de AR/CO (queda por configuración); consulta a `corsox.ftd_ingresos` (sus datos llegan como parámetros obligatorios del request); UI de gestión de clientes del API; sincronización con otros sistemas (SIM, RMS) |
 | **Principio rector** | Un solo servicio multi-tenant, PKG-first contra Oracle, contrato del API en inglés desacoplado del esquema legado mediante diccionario de mapeo |
 
@@ -169,8 +169,8 @@ Listado paginado. `page`/`size` van en el body. Request: `{ "page": 1, "size": 2
 **Notas**
 - `size` máximo 100. Paginación con `OFFSET/FETCH`.
 
-### PUT /api/v1/employees/{idNumber}
-Actualización parcial de datos básicos (campos updatable del diccionario).
+### POST /api/v1/employees/update
+Actualización parcial de datos básicos. `idNumber` (requerido) + campos a actualizar, todo en el body. Request: `{ "idNumber": "12345678", "firstName": "MARIA ALEJANDRA" }`.
 
 **Request**
 ```json
@@ -185,8 +185,8 @@ Actualización parcial de datos básicos (campos updatable del diccionario).
 - PKG-first: si `pkg_management_employee` expone procedimiento de actualización, se envuelve; fallback: UPDATE controlado. [PENDIENTE: resultado Task 0]
 - Body vacío → 422 "Nothing to update".
 
-### DELETE /api/v1/employees/{idNumber}
-Borrado lógico (status inactivo). Responde 204 sin body. No existe → 404.
+### POST /api/v1/employees/delete
+Borrado lógico (`IN_REL_TRAB='N'`). `idNumber` en el body. Request: `{ "idNumber": "12345678" }`. Responde 204 sin body. No existe → 404.
 
 ### GET /health · GET /health/ready
 Liveness y readiness (incluye países con pool activo). Públicos, para Cloud Run.
@@ -265,8 +265,8 @@ Notas del modelo:
 | Procedimiento | Entrada (I_JSON) | Salida | Uso en el API |
 |---|---|---|---|
 | `PRC_GET_EMPLOYEE` | `{"idNumber":"..."} ` o `{"page":n,"size":n}` | `O_JSON {"employees":[...]}` | GET by id / GET paginado |
-| `PRC_MERGE_EMPLOYEE` | `{"employees":[{...}]}` | `O_COD/O_MESSAGE` | POST (insert) y PUT (update) vía MERGE |
-| `PRC_DELETE_EMPLOYEE` | `{"idNumber":"..."}` | `O_COD/O_MESSAGE` | DELETE lógico (`IN_REL_TRAB='N'`) |
+| `PRC_MERGE_EMPLOYEE` | `{"employees":[{...}]}` | `O_COD/O_MESSAGE` | create y update vía MERGE (POST /employees y /employees/update) |
+| `PRC_DELETE_EMPLOYEE` | `{"idNumber":"..."}` | `O_COD/O_MESSAGE` | borrado lógico `IN_REL_TRAB='N'` (POST /employees/delete) |
 
 El script completo del paquete (spec + body, estilo FTD) se entrega en `db/pkg_management_employee_api.sql`.
 

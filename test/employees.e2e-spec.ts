@@ -155,19 +155,20 @@ describe('Employees e2e', () => {
       .expect(200)
       .expect(({ body }) => expect(body).toMatchObject({ page: 1, size: 20 })));
 
-  it('PUT → 200', () =>
+  it('POST update (id in body) → 200', () =>
     request(app.getHttpServer())
-      .put('/api/v1/employees/12345678')
+      .post('/api/v1/employees/update')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
-      .send({ firstName: 'ANA' })
+      .send({ idNumber: '12345678', firstName: 'ANA' })
       .expect(200));
 
-  it('DELETE → 204', () =>
+  it('POST delete (id in body) → 204', () =>
     request(app.getHttpServer())
-      .delete('/api/v1/employees/12345678')
+      .post('/api/v1/employees/delete')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Country-Code', 'VE')
+      .send({ idNumber: '12345678' })
       .expect(204));
 
   it('health endpoints are public', async () => {

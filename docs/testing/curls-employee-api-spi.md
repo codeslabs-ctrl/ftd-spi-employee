@@ -113,24 +113,26 @@ curl -s -X POST "$BASE_URL/api/v1/employees/list" \
 
 Esperado — `200`: `{ "page": 1, "size": 20, "items": [...] }`.
 
-### 2.4 Actualizar (200)
+### 2.4 Actualizar (POST update, 200)
 
 ```bash
-curl -s -X PUT "$BASE_URL/api/v1/employees/12345678" \
+curl -s -X POST "$BASE_URL/api/v1/employees/update" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Country-Code: VE" \
-  -d '{ "firstName": "MARIA ALEJANDRA", "city": "VALENCIA" }'
+  -d '{ "idNumber": "12345678", "firstName": "MARIA ALEJANDRA", "city": "VALENCIA" }'
 ```
 
 Esperado — `200` con el empleado actualizado.
 
-### 2.5 Eliminar — borrado lógico (204)
+### 2.5 Eliminar — borrado lógico (POST delete, 204)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X DELETE "$BASE_URL/api/v1/employees/12345678" \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE_URL/api/v1/employees/delete" \
+  -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Country-Code: VE"
+  -H "X-Country-Code: VE" \
+  -d '{ "idNumber": "12345678" }'
 ```
 
 Esperado: `204` (marca `IN_REL_TRAB='N'`, no borra el registro).

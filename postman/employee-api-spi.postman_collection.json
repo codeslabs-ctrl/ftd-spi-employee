@@ -134,7 +134,7 @@
           }
         },
         {
-          "name": "Update employee (200)",
+          "name": "Update employee (POST 200)",
           "event": [
             {
               "listen": "test",
@@ -145,18 +145,19 @@
             }
           ],
           "request": {
-            "method": "PUT",
+            "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/12345678",
-            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"MARIA ALEJANDRA\"\n}" }
+            "url": "{{baseUrl}}/api/v1/employees/update",
+            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\",\n  \"firstName\": \"MARIA ALEJANDRA\"\n}" },
+            "description": "idNumber en el body (no en la URL). Estilo Farmatodo P2C."
           }
         },
         {
-          "name": "Delete employee (204)",
+          "name": "Delete employee (POST 204)",
           "event": [
             {
               "listen": "test",
@@ -167,12 +168,14 @@
             }
           ],
           "request": {
-            "method": "DELETE",
+            "method": "POST",
             "header": [
+              { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "X-Country-Code", "value": "VE" }
             ],
-            "url": "{{baseUrl}}/api/v1/employees/12345678"
+            "url": "{{baseUrl}}/api/v1/employees/delete",
+            "body": { "mode": "raw", "raw": "{\n  \"idNumber\": \"12345678\"\n}" }
           }
         }
       ]
