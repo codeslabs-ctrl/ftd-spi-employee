@@ -1,7 +1,6 @@
 # Diseño — API de Empleado SPI (ftd-spi-employee)
 
 **Fecha:** 2026-07-02
-**Autor:** Carlos Rodríguez / Claude
 **Estado:** Aprobado (diseño validado en sesión de brainstorming)
 
 ## 1. Objetivo

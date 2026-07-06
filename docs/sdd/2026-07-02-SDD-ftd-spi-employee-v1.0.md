@@ -3,7 +3,6 @@
 ### Versión 1.0
 
 **Estado:** Análisis y Diseño (aprobado — inicia desarrollo)
-**Autor(es):** carlos.rodriguez@farmatodo.com
 **Fecha:** 2026-07-02
 
 | Aprobador | Comentario |
