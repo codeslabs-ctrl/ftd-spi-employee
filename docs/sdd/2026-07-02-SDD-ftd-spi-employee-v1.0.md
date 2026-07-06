@@ -254,7 +254,7 @@ El servicio **no crea tablas propias**: opera sobre `INFOCENT.EO_PERSONA` (estru
 | `email` | `E_MAIL1` | VARCHAR2(60) |
 
 Notas del modelo:
-- El PK `ID` (NUMBER(20)) es **interno**; el API identifica por `NUM_IDEN`. El MERGE del PKG casa por `NUM_IDEN` e inserta con secuencia para `ID`.
+- El PK `ID` (NUMBER(20)) es **interno**; el API identifica por `NUM_IDEN`. El PKG casa por `NUM_IDEN` (UPDATE; si no existe, INSERT) y genera el `ID` desde `INFOCENT.SPI_KEY` (`name_key='EOPERSONA'`), no con secuencia.
 - `EO_PERSONA` **no tiene columna de status**: el borrado lógico usa `IN_REL_TRAB = 'N'` (indicador de relación laboral) y la auditoría usa `USRCRE/FECCRE/USRACT/FECACT`.
 - `corsox.ftd_ingresos` **no se consulta**: es el origen funcional de los datos que el cliente envía en el request.
 - Idempotencia: el MERGE es naturalmente idempotente por `NUM_IDEN`; validaciones del PKG → `O_COD` ≠ éxito → 422.
@@ -285,8 +285,9 @@ No aplica en V1: todos los flujos son síncronos request/response. Los pools de 
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| La firma real de `prc_crear_datos_basicos` difiere de la asumida | Retrabajo en DTOs/binds; bloqueo del POST | Task 0 obligatoria antes de integrar; el diccionario `EMPLOYEE_FIELD_MAP` concentra el cambio en un solo archivo |
-| El PKG no expone procedimientos de update/delete | PUT/DELETE requieren SQL directo sobre BD espejo | Fallback documentado (UPDATE controlado + borrado lógico); validar con el DBA dueño del PKG |
+| Oracle **12.1.0.2**: `JSON_OBJECT`/`JSON_ARRAYAGG` no soportan `RETURNING CLOB` (llegó en 12.2) | El GET no puede armar el JSON con las funciones nativas | **Resuelto:** el PKG arma el CLOB a mano con `FN_JSON_ESCAPE`/`FN_JSON_PAIR` + `DBMS_LOB`. `JSON_TABLE` (entrada) y `OFFSET/FETCH` sí están en 12.1 |
+| No existe secuencia para `EO_PERSONA.ID` | El INSERT no puede generar el PK | **Resuelto:** el ID se obtiene de `INFOCENT.SPI_KEY` (`name_key='EOPERSONA'`) vía `FN_NEXT_KEY` con `FOR UPDATE` (sin carreras) |
+| Valores reales de `PKG_GLOBAL_CONSTANTS` (éxito / sin registros) distintos a los asumidos | Mapeo HTTP incorrecto | Constantes concentradas en `employees.repository.ts` (`SUCCESS_CODE`/`NO_RECORDS_CODE`); confirmar al compilar el PKG |
 | Conectividad Cloud Run → BD SPI (VPC connector) no disponible a tiempo | Bloquea despliegue e integración (Sprint 3) | Solicitar el connector al equipo de redes desde el Sprint 1; desarrollo y tests no dependen de la BD |
 | Agotamiento de conexiones Oracle por escalado de Cloud Run | Errores 500 intermitentes bajo carga | Alinear `concurrency` de Cloud Run con `POOL_MAX`; `min-instances=1`; monitoreo de pool en `/health/ready` |
 | Fuga de secretos (llaves RSA, credenciales Oracle) | Acceso indebido a datos de empleados | Secret Manager exclusivamente; nunca en repo ni logs; rotación de llaves documentada |
