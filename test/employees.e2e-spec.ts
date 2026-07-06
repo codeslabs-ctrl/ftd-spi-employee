@@ -184,8 +184,8 @@ describe('Employees e2e', () => {
     const employee = {
       idNumber: '55555555',
       nationality: 'VENEZOLANO',
-      firstName: 'CARLOS',
-      lastName: 'RODRIGUEZ',
+      firstName: 'PEDRO',
+      lastName: 'GOMEZ',
       birthDate: '1988-03-10',
       gender: 'M',
     };

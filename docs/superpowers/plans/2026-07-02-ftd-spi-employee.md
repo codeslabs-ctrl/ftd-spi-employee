@@ -9,7 +9,7 @@
 **Tech Stack:** Node 20 LTS, NestJS 10, TypeScript, `oracledb` (thin), `@nestjs/passport` + `passport-jwt` + `jsonwebtoken`, `class-validator`, `@nestjs/swagger`, Jest + supertest, Docker, Cloud Run, Cloud Build, Secret Manager, Serverless VPC Access.
 
 **Spec:** `docs/superpowers/specs/2026-07-02-ftd-spi-employee-design.md`
-**Raíz del proyecto:** `C:\Users\cerodriguez\Desktop\DOCUMENTACIONES\PERSONALES\ftd-spi-employee`
+**Raíz del proyecto:** `<ruta-local>/ftd-spi-employee`
 
 ---
 
@@ -100,7 +100,7 @@ git commit -m "docs: firma real de pkg_management_employee desde BD espejo VE"
 - [ ] **Step 1: Generar el proyecto e iniciar git**
 
 ```bash
-cd "C:\Users\cerodriguez\Desktop\DOCUMENTACIONES\PERSONALES"
+cd "<ruta-local>"
 npx --yes @nestjs/cli@10 new ftd-spi-employee --package-manager npm --skip-git
 cd ftd-spi-employee
 git init -b main
