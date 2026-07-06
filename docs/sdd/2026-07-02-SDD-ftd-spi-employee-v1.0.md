@@ -27,18 +27,18 @@
 | | |
 |---|---|
 | **Objetivo** | API RESTful de empleados SPI con CRUD completo, seguridad JWT y enrutamiento multi-tenant por país |
-| **Incluye** | `POST /auth/token` (emisión JWT RS256 TTL 12h); CRUD `/ftd-spi-employee/rest/employee/create` — todas las operaciones por POST (create, search, list, update, delete lógico) con el identificador en el body; middleware `X-Country-Code` (ISO 3166-1 alfa-2); pools Oracle por país (VE activo); despliegue Cloud Run + Cloud Build; Swagger; quality gate SonarQube ≥80% |
+| **Incluye** | `POST /security/token` (emisión JWT RS256 TTL 12h); CRUD `/ftd-spi-employee/rest/employee/create` — todas las operaciones por POST (create, search, list, update, delete lógico) con el identificador en el body; middleware `X-Country-Code` (ISO 3166-1 alfa-2); pools Oracle por país (VE activo); despliegue Cloud Run + Cloud Build; Swagger; quality gate SonarQube ≥80% |
 | **Fuera de alcance** | Habilitación efectiva de AR/CO (queda por configuración); consulta a `corsox.ftd_ingresos` (sus datos llegan como parámetros obligatorios del request); UI de gestión de clientes del API; sincronización con otros sistemas (SIM, RMS) |
 | **Principio rector** | Un solo servicio multi-tenant, PKG-first contra Oracle, contrato del API en inglés desacoplado del esquema legado mediante diccionario de mapeo |
 
 ## 4. Drivers de diseño y decisiones clave
 
-- **PKG-first (estándar FTD):** toda la operación pasa por procedimientos de `corsox.pkg_management_employee` con el contrato estándar FTD `I_JSON CLOB → O_JSON CLOB / O_COD / O_MESSAGE`: los GET devuelven JSON con `JSON_ARRAYAGG/JSON_OBJECT` y las escrituras hacen `MERGE` parseando `I_JSON` con `JSON_TABLE`. Los códigos de respuesta usan `UTILITY.PKG_GLOBAL_CONSTANTS`. La lógica de negocio permanece en la BD.
+- **PKG-first (estándar FTD):** toda la operación pasa por procedimientos de `corsox.pkg_management_employee` con el contrato estándar FTD `I_JSON CLOB → O_JSON CLOB / O_COD / O_MESSAGE`. Sobre **Oracle 12.1.0.2**: la entrada se parsea con `JSON_TABLE`; el GET arma el JSON de salida **a mano** (`FN_JSON_ESCAPE`/`FN_JSON_PAIR` + `DBMS_LOB`, porque `JSON_OBJECT/JSON_ARRAYAGG RETURNING CLOB` llegó en 12.2); las escrituras hacen `UPDATE`; si no existe, `INSERT` con el `ID` obtenido de `INFOCENT.SPI_KEY`. Los códigos de respuesta usan `PKG_GLOBAL_CONSTANTS`. La lógica de negocio permanece en la BD.
 - **Multi-tenant en un solo despliegue:** un pool `oracledb` por país creado al bootstrap; `X-Country-Code` resuelve el pool por request. Habilitar un país nuevo = agregar variables `DB_<CC>_*`, sin código.
-- **Contrato en inglés, esquema en español:** el diccionario `EMPLOYEE_FIELD_MAP` (campo API → bind PKG → columna) es la única fuente de verdad; de él se generan binds, PL/SQL, UPDATE y mapeo de respuesta. Agregar un atributo = 1 campo DTO + 1 entrada del mapa.
+- **Contrato en inglés, esquema en español:** el API intercambia JSON con campos en inglés (`idNumber`, `firstName`…); el PKG traduce hacia las columnas de `EO_PERSONA` (`NUM_IDEN`, `NOMBRE1`…) y convierte `gender` M/F ↔ `SEXO` 1/2 con `DECODE`. En el lado Node, la lista `EMPLOYEE_JSON_FIELDS` (`toEmployeePayload`) define qué campos se envían; agregar un atributo = 1 campo DTO + 1 entrada en la lista + su columna en el PKG.
 - **Seguridad autocontenida:** el propio servicio emite JWT RS256 (llaves en Secret Manager) con TTL de 12 horas y claim `countries` que un guard valida contra `X-Country-Code` (403 si el cliente no está autorizado para el país).
 - **Cifrado de payload front↔back (P2C):** el body viaja cifrado con **CryptoJS.AES** (librería `crypto-js`, formato OpenSSL "Salted__"). El front envía el campo `RequestJson` cifrado y recibe `ResponseJson` cifrado, con una passphrase compartida en Secret Manager (`PAYLOAD_ENCRYPTION_KEY`). Un interceptor descifra antes de la validación y cifra la respuesta.
-- **Defensa en profundidad:** `helmet` + HSTS, rate limiting (`@nestjs/throttler`: 60/min global, 10/min en `/auth/token`), CORS restringido por origen (`CORS_ORIGINS`), comparación de secreto en tiempo constante, y Swagger deshabilitado en producción.
+- **Defensa en profundidad:** `helmet` + HSTS, rate limiting (`@nestjs/throttler`: 60/min global, 10/min en `/security/token`), CORS restringido por origen (`CORS_ORIGINS`), comparación de secreto en tiempo constante, y Swagger deshabilitado en producción.
 - **Serverless nativo GCP:** Cloud Run con escalado automático; conectividad a la BD SPI vía Serverless VPC Access; secretos en Secret Manager; CI/CD en Cloud Build.
 - **DELETE lógico:** nunca borrado físico sobre `EO_PERSONA` (BD espejo de producción); se marca `IN_REL_TRAB='N'`.
 - **Calidad verificable:** TDD, cobertura ≥80% (lcov) como quality gate de SonarQube antes del build de imagen.
@@ -59,14 +59,14 @@
 
 ## 6. Flujo funcional de inicio a fin
 
-1. El sistema cliente solicita token: `POST /auth/token` con `client_id`/`client_secret`.
+1. El sistema cliente solicita token: `POST /security/token` con `client_id`/`client_secret`.
 2. `ftd-spi-employee` valida credenciales contra los clientes registrados (Secret Manager) y responde JWT RS256 con `exp = iat + 12h` y claim `countries`.
 3. El cliente invoca un endpoint CRUD con `Authorization: Bearer <jwt>` y `X-Country-Code: VE`.
 4. El guard JWT valida firma RS256, emisor y vigencia (401 si falla).
-5. El middleware de tenancy valida el header (400/422/403 según el caso) y resuelve el pool Oracle de VE.
-6. Para creación: el repositorio construye el bloque PL/SQL desde `EMPLOYEE_FIELD_MAP` y ejecuta `corsox.pkg_management_employee.prc_crear_datos_basicos` con los datos del request (los parámetros que en origen provienen de `corsox.ftd_ingresos` — el servicio no consulta esa tabla).
-7. El PKG responde código/mensaje OUT; código ≠ 0 se mapea a 422 con el mensaje del PKG; éxito responde 201.
-8. Para consultas: SELECT sobre `INFOCENT.EO_PERSONA`, la fila se traduce a campos en inglés vía el mismo diccionario; 404 si no existe.
+5. El guard de tenancy valida el header (400/422/403 según el caso) y resuelve el pool Oracle de VE.
+6. Para escritura: el repositorio arma `I_JSON = {"employees":[{...}]}` y llama `prc_merge_employee`; el PKG hace `UPDATE` por `NUM_IDEN` y, si no existe, `INSERT` con el `ID` de `INFOCENT.SPI_KEY` (los datos que en origen provienen de `corsox.ftd_ingresos` — el servicio no consulta esa tabla).
+7. El PKG responde `O_COD`/`O_MESSAGE`; código ≠ éxito se mapea a 422 con el mensaje del PKG; éxito responde 201 (create) / 200 (update).
+8. Para consultas: `prc_get_employee` arma el JSON `{"employees":[...]}` (claves en inglés, `SEXO` decodificado a M/F); el repositorio lo devuelve tal cual; 404 si no hay registros.
 9. Errores Oracle se mapean: ORA-00001 → 409; ORA-20xxx → 422; resto → 500 sin filtrar detalles internos.
 10. Todo request queda en Cloud Logging con `country`, `requestId` y `sub` del token (sin datos sensibles).
 
@@ -97,7 +97,7 @@ Emite el token de acceso del API. Único endpoint público junto a health y docs
 - `expires_in` fijo en 43200 s (12 h) por premisa de seguridad.
 
 ### POST /ftd-spi-employee/rest/employee/create
-Crea los datos básicos del empleado envolviendo `prc_crear_datos_basicos`.
+Crea los datos básicos del empleado envolviendo `prc_merge_employee`.
 
 **Request**
 ```json
@@ -131,7 +131,7 @@ Obligatorios: `idNumber`, `nationality`, `firstName`, `lastName`, `birthDate`, `
 ```
 
 **Notas**
-- El API arma `I_JSON = {"employees":[{...}]}` y llama `prc_merge_employee(I_JSON, O_COD, O_MESSAGE)`; el procedimiento hace `MERGE` sobre `EO_PERSONA` usando `JSON_TABLE` (patrón FTD), casando por `NUM_IDEN`.
+- El API arma `I_JSON = {"employees":[{...}]}` y llama `prc_merge_employee(I_JSON, O_COD, O_MESSAGE)`; el procedimiento parsea con `JSON_TABLE` y hace `UPDATE` por `NUM_IDEN` (si existe) o `INSERT` con el `ID` de `SPI_KEY`.
 - `gender` viaja como `M`/`F` en el API; el PKG lo traduce a `SEXO` `'1'`/`'2'` con `DECODE`.
 - Validación por campo con class-validator (longitudes reales de columna: `firstName` ≤17, `middleName` ≤15, etc.) → 400 con detalle. Duplicado → 409. `O_COD` distinto de éxito → 422 con `O_MESSAGE`.
 
@@ -200,7 +200,7 @@ Liveness y readiness (incluye países con pool activo). Públicos, para Cloud Ru
 | Autorización por país | Guard valida el claim `countries` del token vs `X-Country-Code` → **403** si no autorizado |
 | Cifrado en tránsito | TLS terminado en Cloud Run + **HSTS** (`helmet`). El servicio siempre va detrás de TLS |
 | Cifrado de payload (P2C) | **CryptoJS.AES** (`crypto-js`) — ver detalle abajo |
-| Rate limiting | `@nestjs/throttler`: 60 req/min global, **10 req/min** en `/auth/token` (429) |
+| Rate limiting | `@nestjs/throttler`: 60 req/min global, **10 req/min** en `/security/token` (429) |
 | CORS | Allowlist por `CORS_ORIGINS` (ej. `https://mi-portal.farmatodo.com`), `credentials: true` |
 | Cabeceras | `helmet` (HSTS, `X-Content-Type-Options`, `X-Frame-Options`, etc.) |
 | Credenciales de cliente | Hash SHA-256, comparación en **tiempo constante** (`crypto.timingSafeEqual`) |
@@ -229,7 +229,7 @@ Front (crypto-js)                 ftd-spi-employee
 |---|---|---|---|
 | Emisión de token | Sistema cliente (RRHH/integraciones) | `ftd-spi-employee` | `client_id`/`client_secret` → JWT RS256, `expires_in: 43200` |
 | CRUD empleados | Sistema cliente | `ftd-spi-employee` | JSON en inglés + headers `Authorization` y `X-Country-Code` |
-| Creación en SPI | `ftd-spi-employee` (repository) | BD Oracle SPI (`corsox.pkg_management_employee`) | Binds nombrados desde `EMPLOYEE_FIELD_MAP`; OUT: código + mensaje |
+| Creación/actualización en SPI | `ftd-spi-employee` (repository) | BD Oracle SPI (`corsox.pkg_management_employee`) | `prc_merge_employee(I_JSON)`; UPDATE/INSERT por `NUM_IDEN`, `ID` desde `SPI_KEY`; OUT: `O_COD`/`O_MESSAGE` |
 | Consulta en SPI | `ftd-spi-employee` (repository) | BD Oracle SPI (`INFOCENT.EO_PERSONA`) | SELECT parametrizado; fila → JSON inglés vía diccionario |
 
 ## 9. Modelo de datos mínimo
@@ -257,14 +257,14 @@ Notas del modelo:
 - El PK `ID` (NUMBER(20)) es **interno**; el API identifica por `NUM_IDEN`. El PKG casa por `NUM_IDEN` (UPDATE; si no existe, INSERT) y genera el `ID` desde `INFOCENT.SPI_KEY` (`name_key='EOPERSONA'`), no con secuencia.
 - `EO_PERSONA` **no tiene columna de status**: el borrado lógico usa `IN_REL_TRAB = 'N'` (indicador de relación laboral) y la auditoría usa `USRCRE/FECCRE/USRACT/FECACT`.
 - `corsox.ftd_ingresos` **no se consulta**: es el origen funcional de los datos que el cliente envía en el request.
-- Idempotencia: el MERGE es naturalmente idempotente por `NUM_IDEN`; validaciones del PKG → `O_COD` ≠ éxito → 422.
+- Idempotencia: el upsert es naturalmente idempotente por `NUM_IDEN` (UPDATE si existe); validaciones del PKG → `O_COD` ≠ éxito → 422.
 
 **Procedimientos del PKG (contrato FTD `I_JSON/O_JSON/O_COD/O_MESSAGE`):**
 
 | Procedimiento | Entrada (I_JSON) | Salida | Uso en el API |
 |---|---|---|---|
 | `PRC_GET_EMPLOYEE` | `{"idNumber":"..."} ` o `{"page":n,"size":n}` | `O_JSON {"employees":[...]}` | GET by id / GET paginado |
-| `PRC_MERGE_EMPLOYEE` | `{"employees":[{...}]}` | `O_COD/O_MESSAGE` | create y update vía MERGE (POST /employees y /employees/update) |
+| `PRC_MERGE_EMPLOYEE` | `{"employees":[{...}]}` | `O_COD/O_MESSAGE` | create/update (UPDATE por NUM_IDEN; si no existe INSERT con ID de SPI_KEY) — POST /employee/create y /employee/update |
 | `PRC_DELETE_EMPLOYEE` | `{"idNumber":"..."}` | `O_COD/O_MESSAGE` | borrado lógico `IN_REL_TRAB='N'` (POST /employees/delete) |
 
 El script completo del paquete (spec + body, estilo FTD) se entrega en `db/pkg_management_employee_api.sql`.
@@ -278,7 +278,7 @@ No aplica en V1: todos los flujos son síncronos request/response. Los pools de 
 | Sprint | Tiempo | Objetivo | Entregables principales |
 |---|---|---|---|
 | 1 | 1 semana | Fundaciones del servicio | Scaffold NestJS, config multi-país, filtro de errores estándar, middleware `X-Country-Code`, pools Oracle, auth JWT RS256 completa (Tasks 1–6 del plan) |
-| 2 | 1 semana | CRUD de empleados | DTOs en inglés, `EMPLOYEE_FIELD_MAP`, repository PKG-first, controller/service, e2e, health, Swagger, cobertura ≥80% (Tasks 7–10) |
+| 2 | 1 semana | CRUD de empleados | DTOs en inglés, contrato JSON (`toEmployeePayload`), repository PKG-first, controller/service, e2e, health, Swagger, cobertura ≥80% (Tasks 7–10) |
 | 3 | 1 semana | Verificación BD + despliegue | Firma real del PKG (Task 0) y ajuste de binds, Docker, Cloud Build, setup GCP (secretos, VPC connector), deploy Cloud Run, integración contra espejo VE, colección Postman y Self QA (Tasks 8-ajuste, 11–12) |
 
 ## 12. Riesgos y mitigaciones
