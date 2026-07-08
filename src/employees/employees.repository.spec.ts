@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { TenantConnectionService } from '../database/tenant-connection.service';
 import { EmployeesRepository } from './employees.repository';
 
@@ -11,6 +12,8 @@ function mockPool(executeImpl: jest.Mock) {
   const conn = { execute: executeImpl, close: jest.fn() };
   return { getConnection: jest.fn(async () => conn) };
 }
+
+const cfg = { get: (k: string) => ({ employeePkg: 'corsox.pkg_management_employee', pkgSuccessCode: '0', pkgNoRecordsCode: '1' })[k] } as unknown as ConfigService;
 
 const tenantSvc = (pool: unknown) =>
   ({ getPool: () => pool }) as unknown as TenantConnectionService;
@@ -31,7 +34,7 @@ const dto = {
 describe('EmployeesRepository', () => {
   it('create calls prc_merge_employee with an employees JSON payload', async () => {
     const execute: jest.Mock = jest.fn(async () => pkgOk());
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     const res = await repo.create('VE', dto);
 
     expect(execute.mock.calls[0][0]).toContain(
@@ -51,23 +54,35 @@ describe('EmployeesRepository', () => {
     const execute: jest.Mock = jest.fn(async () => ({
       outBinds: { o_cod: '2', o_message: 'employee rejected' },
     }));
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     await expect(repo.create('VE', dto)).rejects.toThrow(
       UnprocessableEntityException,
     );
   });
 
-  it('create with PKG WHEN OTHERS (o_cod ORA-xxx) → 500', async () => {
+  it('create with PKG WHEN OTHERS server fault (ORA--942) → 500', async () => {
     const execute: jest.Mock = jest.fn(async () => ({
       outBinds: {
         o_cod: 'ORA--942',
         o_message: 'PRC_MERGE_EMPLOYEE - table missing',
       },
     }));
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     await expect(repo.create('VE', dto)).rejects.toThrow(
       InternalServerErrorException,
     );
+  });
+
+  it('create with FK/constraint violation (ORA--2291) → 422 with clean message', async () => {
+    const execute: jest.Mock = jest.fn(async () => ({
+      outBinds: {
+        o_cod: 'ORA--2291',
+        o_message: 'PRC_MERGE_EMPLOYEE - ORA-02291: integrity constraint violated - parent key not found',
+      },
+    }));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
+    await expect(repo.create('VE', dto)).rejects.toThrow(UnprocessableEntityException);
+    await expect(repo.create('VE', dto)).rejects.toThrow(/ORA-02291/);
   });
 
   it('findById parses O_JSON and returns the first employee', async () => {
@@ -80,7 +95,7 @@ describe('EmployeesRepository', () => {
         }),
       }),
     );
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     const emp = await repo.findById('VE', '12345678');
     expect(execute.mock.calls[0][0]).toContain('prc_get_employee');
     expect(JSON.parse(execute.mock.calls[0][1].i_json)).toEqual({
@@ -96,7 +111,7 @@ describe('EmployeesRepository', () => {
       ),
     };
     const execute: jest.Mock = jest.fn(async () => pkgOk({ o_json: lob }));
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     const emp = await repo.findById('VE', '12345678');
     expect(lob.getData).toHaveBeenCalled();
     expect(emp).toMatchObject({ idNumber: '12345678' });
@@ -106,7 +121,7 @@ describe('EmployeesRepository', () => {
     const execute: jest.Mock = jest.fn(async () => ({
       outBinds: { o_cod: '1', o_message: 'NO EXISTEN REGISTROS', o_json: null },
     }));
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     await expect(repo.findById('VE', '0')).rejects.toThrow(NotFoundException);
   });
 
@@ -118,7 +133,7 @@ describe('EmployeesRepository', () => {
         }),
       }),
     );
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     const res = await repo.findAll('VE', 2, 10);
     expect(JSON.parse(execute.mock.calls[0][1].i_json)).toEqual({
       page: 2,
@@ -135,7 +150,7 @@ describe('EmployeesRepository', () => {
     const execute: jest.Mock = jest.fn(async () => ({
       outBinds: { o_cod: '1', o_message: 'NO EXISTEN REGISTROS', o_json: null },
     }));
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     expect(await repo.findAll('VE', 1, 20)).toEqual({
       page: 1,
       size: 20,
@@ -159,7 +174,7 @@ describe('EmployeesRepository', () => {
           }),
         }),
       );
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     const emp = await repo.update('VE', '12345678', {
       firstName: 'ANA',
     } as any);
@@ -175,7 +190,7 @@ describe('EmployeesRepository', () => {
     const execute: jest.Mock = jest.fn(async () => ({
       outBinds: { o_cod: '1', o_message: 'NO EXISTEN REGISTROS', o_json: null },
     }));
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     await expect(
       repo.update('VE', '0', { firstName: 'X' } as any),
     ).rejects.toThrow(NotFoundException);
@@ -184,7 +199,7 @@ describe('EmployeesRepository', () => {
 
   it('softDelete calls prc_delete_employee; missing employee → 404', async () => {
     const ok: jest.Mock = jest.fn(async () => pkgOk());
-    await new EmployeesRepository(tenantSvc(mockPool(ok))).softDelete(
+    await new EmployeesRepository(tenantSvc(mockPool(ok)), cfg).softDelete(
       'VE',
       '1',
     );
@@ -194,7 +209,7 @@ describe('EmployeesRepository', () => {
       outBinds: { o_cod: '1', o_message: 'NO EXISTEN REGISTROS' },
     }));
     await expect(
-      new EmployeesRepository(tenantSvc(mockPool(missing))).softDelete(
+      new EmployeesRepository(tenantSvc(mockPool(missing)), cfg).softDelete(
         'VE',
         '0',
       ),
@@ -207,7 +222,7 @@ describe('EmployeesRepository', () => {
         errorNum: 1,
       });
     });
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     await expect(repo.create('VE', dto)).rejects.toThrow(ConflictException);
   });
 
@@ -217,7 +232,7 @@ describe('EmployeesRepository', () => {
         errorNum: 20001,
       });
     });
-    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)));
+    const repo = new EmployeesRepository(tenantSvc(mockPool(execute)), cfg);
     await expect(repo.create('VE', dto)).rejects.toThrow(
       'id already registered',
     );
@@ -228,7 +243,7 @@ describe('EmployeesRepository', () => {
       throw Object.assign(new Error('boom'), { errorNum: 600 });
     });
     const pool = mockPool(execute);
-    const repo = new EmployeesRepository(tenantSvc(pool));
+    const repo = new EmployeesRepository(tenantSvc(pool), cfg);
     await expect(repo.create('VE', dto)).rejects.toThrow();
     const conn = await pool.getConnection.mock.results[0].value;
     expect(conn.close).toHaveBeenCalled();

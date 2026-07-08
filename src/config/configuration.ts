@@ -29,6 +29,10 @@ export interface AppConfig {
   payloadEncryptionKey: string;
   // Allowed browser origins for CORS (empty = CORS disabled).
   corsOrigins: string[];
+  // PKG name (schema.package) and PKG_GLOBAL_CONSTANTS codes — vary per environment.
+  employeePkg: string;
+  pkgSuccessCode: string;
+  pkgNoRecordsCode: string;
 }
 
 export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -68,6 +72,9 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean),
+    employeePkg: env.EMPLOYEE_PKG ?? 'corsox.pkg_management_employee',
+    pkgSuccessCode: env.PKG_SUCCESS_CODE ?? 'FTD-200',
+    pkgNoRecordsCode: env.PKG_NORECORDS_CODE ?? 'FTD-201',
   };
 }
 
