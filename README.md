@@ -3,7 +3,7 @@
 API RESTful multi-tenant para la gestión de empleados del sistema SPI (Farmatodo Digital).
 
 - **Stack:** NestJS 10 · Node 20 · oracledb (thin) · JWT RS256 (TTL 12h) · Cloud Run (GCP)
-- **Multi-tenancy:** header `X-Country-Code` (ISO 3166-1 alfa-2) enruta al pool Oracle del país. VE activo; AR/CO se habilitan solo con variables `DB_<CC>_*`.
+- **Multi-tenancy:** header `X-Country-Code` (ISO 3166-1 alfa-2) enruta al pool Oracle del país. **VE y CO activos**; AR se habilita solo con variables `DB_AR_*`.
 - **PKG-first:** toda la operación pasa por `corsox.pkg_management_employee` con el contrato FTD `I_JSON CLOB → O_JSON / O_COD / O_MESSAGE`. Script del paquete en [db/pkg_management_employee_api.sql](db/pkg_management_employee_api.sql).
 - **Seguridad:** cifrado de payload front↔back con **CryptoJS.AES** (`crypto-js`, campos `RequestJson`/`ResponseJson`), autorización por país (claim `countries` → 403), rate limiting (`@nestjs/throttler`), `helmet`+HSTS, CORS por origen y comparación de secreto en tiempo constante.
 
@@ -46,6 +46,23 @@ Tests y quality gate (SonarQube ≥80%):
 ```bash
 npm run lint && npm test -- --coverage && npm run test:e2e
 ```
+
+## Multi-tenant (países)
+
+Un solo despliegue atiende varios países. El header `X-Country-Code` enruta cada request al pool Oracle correspondiente. Habilitar un país = **solo configuración**, sin cambios de código:
+
+1. Agregar su bloque `DB_<CC>_*` al `.env` (connect string + user + password).
+2. Incluir el código de país en `API_CLIENTS_JSON` → `countries` del cliente (si no, el guard responde `403`).
+
+Ambientes QA probados:
+
+| País | Header | BD (QA) | Esquema |
+|---|---|---|---|
+| Venezuela | `X-Country-Code: VE` | `dlved347:1521/NOMQAVE` | `people_one` |
+| Colombia | `X-Country-Code: CO` | `dlcod321.farmatodo.com:1521/NOMQACO` | `people_one` |
+| Argentina | `X-Country-Code: AR` | *(pendiente de BD)* | — |
+
+`GET /health/ready` reporta los países con pool activo, ej. `{"status":"ok","countries":["CO","VE"]}`.
 
 ## Pruebas locales (modo sin Oracle)
 
