@@ -1,7 +1,14 @@
 
 .env
+.env.production
+.env.staging
+.env.gcp
+.env.*.local
+app.yaml
 keys/
 coverage/
 node_modules/
 dist/
+logs/
+src-nest-backup/
 *.log
