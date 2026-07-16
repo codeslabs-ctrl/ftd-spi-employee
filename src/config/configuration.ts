@@ -15,6 +15,12 @@ export interface ApiClient {
   countries?: string[];
 }
 
+export interface OraclePoolTuning {
+  poolTimeout: number;
+  queueTimeout: number;
+  callTimeout: number;
+}
+
 export interface AppConfig {
   port: number;
   countries: Partial<Record<CountryCode, CountryDbConfig>>;
@@ -25,15 +31,25 @@ export interface AppConfig {
     issuer: string;
   };
   apiClients: ApiClient[];
-  // Shared passphrase for CryptoJS.AES payload encryption (front <-> back). Empty = disabled.
   payloadEncryptionKey: string;
-  // Allowed browser origins for CORS (empty = CORS disabled).
   corsOrigins: string[];
-  // PKG name (schema.package) and PKG_GLOBAL_CONSTANTS codes — vary per environment.
   employeePkg: string;
   pkgSuccessCode: string;
   pkgNoRecordsCode: string;
+  /** Unqualified PKG names — resolved in connection schema (people_one). */
+  positionPkg: string;
+  companyPkg: string;
+  maritalStatusPkg: string;
+  jobPostPkg: string;
+  orgUnitPkg: string;
+  requestTimeoutMs: number;
+  oracle: OraclePoolTuning;
+  rateLimitWindowMs: number;
+  rateLimitMax: number;
+  bodyParserLimit: string;
 }
+
+let cached: AppConfig | null = null;
 
 export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
   const countries: AppConfig['countries'] = {};
@@ -67,15 +83,42 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
       issuer: env.JWT_ISSUER ?? 'ftd-spi-employee',
     },
     apiClients: JSON.parse(env.API_CLIENTS_JSON ?? '[]') as ApiClient[],
-    payloadEncryptionKey: env.PAYLOAD_ENCRYPTION_KEY ?? '',
+    payloadEncryptionKey:
+      env.PAYLOAD_ENCRYPTION_KEY ?? env.AES_SECRET_KEY ?? '',
     corsOrigins: (env.CORS_ORIGINS ?? '')
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean),
-    employeePkg: env.EMPLOYEE_PKG ?? 'corsox.pkg_management_employee',
+    employeePkg: env.EMPLOYEE_PKG ?? 'pkg_management_employee',
     pkgSuccessCode: env.PKG_SUCCESS_CODE ?? 'FTD-200',
     pkgNoRecordsCode: env.PKG_NORECORDS_CODE ?? 'FTD-201',
+    positionPkg: env.POSITION_PKG ?? 'pkg_management_position',
+    companyPkg: env.COMPANY_PKG ?? 'pkg_management_company',
+    maritalStatusPkg:
+      env.MARITAL_STATUS_PKG ?? 'pkg_management_marital_status',
+    jobPostPkg: env.JOB_POST_PKG ?? 'pkg_management_job_post',
+    orgUnitPkg: env.ORG_UNIT_PKG ?? 'pkg_management_org_unit',
+    requestTimeoutMs: Number(
+      env.REQUEST_TIMEOUT_MS ?? env.REQUEST_TIMEOUT ?? 30_000,
+    ),
+    oracle: {
+      poolTimeout: Number(env.ORACLE_POOL_TIMEOUT ?? env.DB_POOL_TIMEOUT ?? 300),
+      queueTimeout: Number(
+        env.ORACLE_QUEUE_TIMEOUT ?? env.DB_QUEUE_TIMEOUT ?? 60_000,
+      ),
+      callTimeout: Number(env.ORACLE_CALL_TIMEOUT ?? 30_000),
+    },
+    rateLimitWindowMs: Number(env.RATE_LIMIT_WINDOW_MS ?? 60_000),
+    rateLimitMax: Number(env.RATE_LIMIT_MAX_REQUESTS ?? 60),
+    bodyParserLimit: env.BODY_PARSER_LIMIT ?? '1mb',
   };
 }
 
-export default () => buildConfig(process.env);
+export function getConfig(): AppConfig {
+  if (!cached) cached = buildConfig(process.env);
+  return cached;
+}
+
+export function resetConfigCache(): void {
+  cached = null;
+}

@@ -1,4 +1,6 @@
-# CI/CD: lint + tests (SonarQube gate) -> build -> push -> deploy to Cloud Run
+# LEGACY (Cloud Run). Supported deploy path is App Engine: npm run deploy / app.yaml
+# Kept for reference only — prefer docs/deploy/PPAP-ftd-spi-employee.md
+
 steps:
   - id: test
     name: node:20
@@ -40,14 +42,36 @@ steps:
       - --vpc-connector=${_VPC_CONNECTOR}
       - --min-instances=1
       - --concurrency=40
-      - --set-secrets=JWT_PRIVATE_KEY_BASE64=jwt-private-key:latest,JWT_PUBLIC_KEY_BASE64=jwt-public-key:latest,DB_VE_PASSWORD=db-ve-password:latest,API_CLIENTS_JSON=api-clients:latest
-      - --set-env-vars=DB_VE_CONNECT_STRING=${_DB_VE_CONNECT_STRING},DB_VE_USER=${_DB_VE_USER},DB_VE_POOL_MIN=1,DB_VE_POOL_MAX=10,JWT_TTL_SECONDS=43200,JWT_ISSUER=ftd-spi-employee
+      - --port=8080
+      - --liveness-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=10,periodSeconds=30,timeoutSeconds=5,failureThreshold=3
+      - --readiness-probe=httpGet.path=/health/ready,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=10,timeoutSeconds=5,failureThreshold=3
+      # ^@^ delimiter allows commas inside CORS_ORIGINS
+      - --set-secrets=JWT_PRIVATE_KEY_BASE64=jwt-private-key:latest,JWT_PUBLIC_KEY_BASE64=jwt-public-key:latest,DB_VE_PASSWORD=db-ve-password:latest,DB_CO_PASSWORD=db-co-password:latest,API_CLIENTS_JSON=api-clients:latest,PAYLOAD_ENCRYPTION_KEY=payload-encryption-key:latest
+      - --set-env-vars=^@^DB_VE_CONNECT_STRING=${_DB_VE_CONNECT_STRING}@DB_VE_USER=${_DB_VE_USER}@DB_VE_POOL_MIN=${_DB_VE_POOL_MIN}@DB_VE_POOL_MAX=${_DB_VE_POOL_MAX}@DB_CO_CONNECT_STRING=${_DB_CO_CONNECT_STRING}@DB_CO_USER=${_DB_CO_USER}@DB_CO_POOL_MIN=${_DB_CO_POOL_MIN}@DB_CO_POOL_MAX=${_DB_CO_POOL_MAX}@JWT_TTL_SECONDS=${_JWT_TTL_SECONDS}@JWT_ISSUER=${_JWT_ISSUER}@EMPLOYEE_PKG=${_EMPLOYEE_PKG}@PKG_SUCCESS_CODE=${_PKG_SUCCESS_CODE}@PKG_NORECORDS_CODE=${_PKG_NORECORDS_CODE}@REQUEST_TIMEOUT_MS=${_REQUEST_TIMEOUT_MS}@ORACLE_POOL_TIMEOUT=${_ORACLE_POOL_TIMEOUT}@ORACLE_QUEUE_TIMEOUT=${_ORACLE_QUEUE_TIMEOUT}@ORACLE_CALL_TIMEOUT=${_ORACLE_CALL_TIMEOUT}@LOG_LEVEL=${_LOG_LEVEL}@CORS_ORIGINS=${_CORS_ORIGINS}@NODE_ENV=production
 
 substitutions:
   _REGION: us-east1
   _VPC_CONNECTOR: spi-connector
   _DB_VE_CONNECT_STRING: ''
-  _DB_VE_USER: ''
+  _DB_VE_USER: people_one
+  _DB_VE_POOL_MIN: '1'
+  _DB_VE_POOL_MAX: '10'
+  _DB_CO_CONNECT_STRING: ''
+  _DB_CO_USER: people_one
+  _DB_CO_POOL_MIN: '1'
+  _DB_CO_POOL_MAX: '10'
+  _JWT_TTL_SECONDS: '43200'
+  _JWT_ISSUER: ftd-spi-employee
+  _EMPLOYEE_PKG: pkg_management_employee
+  _PKG_SUCCESS_CODE: FTD-200
+  _PKG_NORECORDS_CODE: FTD-201
+  _REQUEST_TIMEOUT_MS: '30000'
+  _ORACLE_POOL_TIMEOUT: '300'
+  _ORACLE_QUEUE_TIMEOUT: '60000'
+  _ORACLE_CALL_TIMEOUT: '30000'
+  _LOG_LEVEL: info
+  # Comma-separated origins OK thanks to ^@^ delimiter above
+  _CORS_ORIGINS: ''
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/apis/ftd-spi-employee:$SHORT_SHA
