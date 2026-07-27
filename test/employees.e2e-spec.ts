@@ -1,6 +1,6 @@
 import * as CryptoJS from 'crypto-js';
 import request from 'supertest';
-import { resetConfigCache } from '../src/config/configuration';
+import { getConfig, resetConfigCache } from '../src/config/configuration';
 
 // Env is set in setup-e2e.ts before this file loads
 resetConfigCache();
@@ -204,6 +204,58 @@ describe('Employees e2e (Express SPI contracts)', () => {
       errors: expect.any(Array),
       timestamp: expect.any(String),
       path: '/ftd-spi-employee/rest/employee/create',
+    });
+  });
+
+  describe('REQUIRE_ENCRYPTED_PAYLOAD strict mode', () => {
+    afterEach(() => {
+      delete process.env.REQUIRE_ENCRYPTED_PAYLOAD;
+      resetConfigCache();
+    });
+
+    it('rejects a plaintext business request with 400 when enabled', async () => {
+      process.env.REQUIRE_ENCRYPTED_PAYLOAD = 'true';
+      resetConfigCache();
+      expect(getConfig().requireEncryptedPayload).toBe(true);
+
+      const res = await request(app)
+        .post('/ftd-spi-employee/rest/employee/get')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Country-Code', 'VE')
+        .send({ idNumber: '55555555' })
+        .expect(400);
+      expect(res.body.message).toBe('Encrypted payload required');
+    });
+
+    it('still allows /health and /security/token unencrypted when enabled', async () => {
+      process.env.REQUIRE_ENCRYPTED_PAYLOAD = 'true';
+      resetConfigCache();
+
+      await request(app).get('/health').expect(200);
+      await request(app)
+        .post('/ftd-spi-employee/rest/security/token')
+        .send({ client_id: 'test-client', client_secret: 'test-secret' })
+        .expect(200);
+    });
+
+    it('still allows a properly encrypted business request when enabled', async () => {
+      process.env.REQUIRE_ENCRYPTED_PAYLOAD = 'true';
+      resetConfigCache();
+
+      const KEY = 'e2e-shared-key';
+      const cipher = CryptoJS.AES.encrypt(
+        JSON.stringify({ idNumber: '55555555' }),
+        KEY,
+      ).toString();
+
+      const res = await request(app)
+        .post('/ftd-spi-employee/rest/employee/get')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Country-Code', 'VE')
+        .type('form')
+        .send({ RequestJson: cipher })
+        .expect(200);
+      expect(Object.keys(res.body)).toEqual(['ResponseJson']);
     });
   });
 });

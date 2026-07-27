@@ -28,7 +28,7 @@ API RESTful multi-tenant para gestión de empleados SPI (Farmatodo Digital).
 | POST | `/ftd-spi-employee/rest/org-unit/list` | `{ page, size, items }` |
 | GET | `/health` · `/health/ready` | públicos |
 
-**Cifrado P2C:** si el body trae `RequestJson` (CryptoJS.AES) → se desencripta → respuesta `{ ResponseJson }`. Requests en claro siguen funcionando. Errores: `{ statusCode, message, errors, timestamp, path }`.
+**Cifrado P2C:** si el body trae `RequestJson` (CryptoJS.AES) → se desencripta → respuesta `{ ResponseJson }`. Por defecto, requests en claro siguen funcionando (compatibilidad). Con `REQUIRE_ENCRYPTED_PAYLOAD=true`, los endpoints de negocio (todo excepto `/health` y `/security/token`) rechazan con `400` cualquier request sin `RequestJson`. Errores: `{ statusCode, message, errors, timestamp, path }`.
 
 Headers: `Authorization: Bearer`, `X-Country-Code`.
 

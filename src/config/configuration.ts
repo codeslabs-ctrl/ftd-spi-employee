@@ -32,6 +32,7 @@ export interface AppConfig {
   };
   apiClients: ApiClient[];
   payloadEncryptionKey: string;
+  requireEncryptedPayload: boolean;
   corsOrigins: string[];
   employeePkg: string;
   pkgSuccessCode: string;
@@ -85,6 +86,11 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
     apiClients: JSON.parse(env.API_CLIENTS_JSON ?? '[]') as ApiClient[],
     payloadEncryptionKey:
       env.PAYLOAD_ENCRYPTION_KEY ?? env.AES_SECRET_KEY ?? '',
+    /** If true, business endpoints reject any request without an encrypted
+     * RequestJson body (400) instead of silently allowing plaintext.
+     * Defaults to false to preserve the existing "plain requests still work"
+     * contract (tested in employees.e2e-spec.ts). */
+    requireEncryptedPayload: env.REQUIRE_ENCRYPTED_PAYLOAD === 'true',
     corsOrigins: (env.CORS_ORIGINS ?? '')
       .split(',')
       .map((o) => o.trim())

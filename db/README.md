@@ -11,10 +11,9 @@ Contrato: `I_JSON CLOB → O_JSON? / O_COD / O_MESSAGE` (mismos códigos que Emp
 | company | `pkg_management_company` | `INFOCENT.EO_EMPRESA` | OK |
 | marital-status | `pkg_management_marital_status` | `INFOCENT.EO_ESTADO_CIVIL` | OK |
 | org-unit | `pkg_management_org_unit` | `INFOCENT.EO_UNIDAD` | OK |
-| job-post | `pkg_management_job_post` | `INFOCENT.EO_PUESTO` | **NO existe en QA** |
+| job-post | `pkg_management_job_post` | `INFOCENT.EO_PUESTO` | OK (confirmada, columnas verificadas) |
 
-Para puestos solo aparece `INFOCENT.TA_RELACION_PUESTO` (relación laboral), no el catálogo.  
-El body de `job_post` usa SQL dinámico y apunta a `GC_TABLE = 'INFOCENT.EO_PUESTO'` — el DBA debe crear la tabla o cambiar esa constante.
+Nota histórica: en la verificación inicial (2026-07-16) `INFOCENT.EO_PUESTO` no aparecía en QA VE y solo se encontraba `INFOCENT.TA_RELACION_PUESTO` (relación laboral). Ya se confirmó que la tabla existe con las columnas esperadas (`ID_EMPRESA, ID_UNIDAD, ID, NOMBRE, ID_CARGO, DESCRIP, FUNCION, FECHA_INI, FECHA_FIN, RIESGO`), así que el paquete se reescribió con `SELECT` estático (mismo estilo que `position`) en vez del SQL dinámico que se usaba como salvaguarda.
 
 ## Compilar
 
