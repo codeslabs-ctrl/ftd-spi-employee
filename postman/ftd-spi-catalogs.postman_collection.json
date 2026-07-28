@@ -1,0 +1,663 @@
+{
+  "info": {
+    "name": "FTD SPI Catalogs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "12 catálogos de solo lectura, un solo paquete Oracle compartido (pkg_management_catalogs). Todos con el mismo contrato: POST /catalogs/<key>/list con { page, size } -> { page, size, items }.\n\nVariables: {{baseUrl}}, {{clientId}}, {{clientSecret}}. Ejecutar Auth > Get Token primero. Soporta cifrado P2C igual que el resto del API (no ejercitado aquí, ver colección Employee para el patrón)."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "clientId",
+      "value": "hr-integration"
+    },
+    {
+      "key": "clientSecret",
+      "value": "local-secret-2026"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Get Token (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/security/token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalogs",
+      "item": [
+        {
+          "name": "List Municipalities (Municipios) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/municipalities/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Countries (Países) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/countries/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Parishes (Parroquias) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/parishes/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Localities (Localidades) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/localities/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Cities (validación de ciudad) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/cities/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List States (entidades federales) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/states/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Payroll types (tipos de nómina) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/payroll-types/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Groups (grupos) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/groups/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Branches (sucursales) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/branches/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Banks (validación de banco) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/banks/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List Account types (tipos de cuenta) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/account-types/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "List ID types (tipos de identificación) (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/id-types/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative cases",
+      "item": [
+        {
+          "name": "No token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/countries/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        },
+        {
+          "name": "Missing X-Country-Code (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/countries/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        },
+        {
+          "name": "Country not enabled AR (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "AR"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/countries/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        },
+        {
+          "name": "Unknown catalog key (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "VE"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/does-not-exist/list",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

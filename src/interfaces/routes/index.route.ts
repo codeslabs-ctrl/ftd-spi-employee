@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRouter from '../../modules/auth/auth.route';
+import catalogsRouter from '../../modules/catalogs/catalogs.route';
 import companyRouter from '../../modules/company/company.route';
 import employeeRouter from '../../modules/employee/employee.route';
 import { healthController } from '../../modules/health/health.controller';
@@ -23,6 +24,7 @@ api.use('/company', companyRouter);
 api.use('/marital-status', maritalStatusRouter);
 api.use('/job-post', jobPostRouter);
 api.use('/org-unit', orgUnitRouter);
+api.use('/catalogs', catalogsRouter);
 router.use('/ftd-spi-employee/rest', api);
 
 router.use('*', (req, res) => {

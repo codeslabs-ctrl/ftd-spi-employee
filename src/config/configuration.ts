@@ -43,6 +43,8 @@ export interface AppConfig {
   maritalStatusPkg: string;
   jobPostPkg: string;
   orgUnitPkg: string;
+  /** Un solo paquete Oracle compartido por todos los catálogos de solo lectura. */
+  catalogsPkg: string;
   requestTimeoutMs: number;
   oracle: OraclePoolTuning;
   rateLimitWindowMs: number;
@@ -104,6 +106,7 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
       env.MARITAL_STATUS_PKG ?? 'pkg_management_marital_status',
     jobPostPkg: env.JOB_POST_PKG ?? 'pkg_management_job_post',
     orgUnitPkg: env.ORG_UNIT_PKG ?? 'pkg_management_org_unit',
+    catalogsPkg: env.CATALOGS_PKG ?? 'pkg_management_catalogs',
     requestTimeoutMs: Number(
       env.REQUEST_TIMEOUT_MS ?? env.REQUEST_TIMEOUT ?? 30_000,
     ),

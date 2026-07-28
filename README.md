@@ -26,7 +26,29 @@ API RESTful multi-tenant para gestión de empleados SPI (Farmatodo Digital).
 | POST | `/ftd-spi-employee/rest/job-post/list` | `{ page, size, items }` |
 | POST | `/ftd-spi-employee/rest/org-unit/get` | org-unit |
 | POST | `/ftd-spi-employee/rest/org-unit/list` | `{ page, size, items }` |
+| POST | `/ftd-spi-employee/rest/catalogs/<catálogo>/list` | `{ page, size, items }` — ver tabla de catálogos abajo |
 | GET | `/health` · `/health/ready` | públicos |
+
+## Catálogos (`/catalogs/<clave>/list`)
+
+Un solo paquete Oracle (`CATALOGS_PKG`, ver `db/pkg_management_catalogs_api.sql`) para todos los catálogos de solo lectura. Mensajes de error en español (capa aparte, `src/shared/oracle/catalog-pkg-assert.ts`, no afecta los demás módulos).
+
+| Clave (`key`) | Catálogo |
+|---|---|
+| `municipalities` | Municipios |
+| `countries` | Países |
+| `parishes` | Parroquias |
+| `localities` | Localidades |
+| `cities` | Ciudades (validación de ciudad) |
+| `states` | Entidades federales (siglas de estados) |
+| `payroll-types` | Tipos de nómina |
+| `groups` | Descripción de grupos |
+| `branches` | Sucursales |
+| `banks` | Bancos (validación de banco) |
+| `account-types` | Tipos de cuenta para depósito |
+| `id-types` | Tipos de identificación |
+
+**Pendiente:** "Validar reingreso" (a partir de la cédula) no está incluido todavía — falta la consulta SQL. Se agrega en cuanto llegue.
 
 **Cifrado P2C:** si el body trae `RequestJson` (CryptoJS.AES) → se desencripta → respuesta `{ ResponseJson }`. Por defecto, requests en claro siguen funcionando (compatibilidad). Con `REQUIRE_ENCRYPTED_PAYLOAD=true`, los endpoints de negocio (todo excepto `/health` y `/security/token`) rechazan con `400` cualquier request sin `RequestJson`. Errores: `{ statusCode, message, errors, timestamp, path }`.
 
@@ -90,3 +112,4 @@ Documentación vigente **v2.0** (Express + App Engine + 6 recursos). Los `v1.0` 
 - Setup GCP / runbook: [docs/deploy/gcp-setup.md](docs/deploy/gcp-setup.md) · PPAP: [docs/deploy/PPAP-ftd-spi-employee.md](docs/deploy/PPAP-ftd-spi-employee.md)
 - Postman Employee (P2C): [postman/ftd-spi-employee.postman_collection.json](postman/ftd-spi-employee.postman_collection.json)
 - Postman CRUD adicionales (P2C): [postman/ftd-spi-additional-crud.postman_collection.json](postman/ftd-spi-additional-crud.postman_collection.json)
+- Postman Catalogs (JSON plano): [postman/ftd-spi-catalogs.postman_collection.json](postman/ftd-spi-catalogs.postman_collection.json) — generada con `node scripts/build-catalogs-postman.js`

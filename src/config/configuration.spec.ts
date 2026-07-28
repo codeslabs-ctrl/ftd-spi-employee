@@ -29,6 +29,7 @@ describe('buildConfig', () => {
     expect(cfg.maritalStatusPkg).toBe('pkg_management_marital_status');
     expect(cfg.jobPostPkg).toBe('pkg_management_job_post');
     expect(cfg.orgUnitPkg).toBe('pkg_management_org_unit');
+    expect(cfg.catalogsPkg).toBe('pkg_management_catalogs');
   });
 
   it('overrides resource PKG names from env', () => {

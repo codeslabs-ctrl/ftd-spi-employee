@@ -9,6 +9,7 @@ const FILES = [
   'pkg_management_marital_status_api.sql',
   'pkg_management_job_post_api.sql',
   'pkg_management_org_unit_api.sql',
+  'pkg_management_catalogs_api.sql',
 ];
 
 function splitStatements(sql) {
