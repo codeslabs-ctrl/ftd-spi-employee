@@ -139,21 +139,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
   END FN_JSON_ESCAPE;
 
   /*=========================================================================
-   [FN_JSON_PAIR] — usado por el motor genérico (PRC_GET_GENERIC_CATALOG):
-   fuerza minúscula porque la clave viene del nombre de columna tal cual la
-   entrega DESCRIBE_COLUMNS3 (siempre en mayúscula). No tocar: cambia el
-   contrato de los catálogos que todavía usan el motor genérico.
-  ==========================================================================*/
-  FUNCTION FN_JSON_PAIR(P_KEY IN VARCHAR2, P_VAL IN VARCHAR2) RETURN VARCHAR2 IS
-  BEGIN
-    IF P_VAL IS NULL THEN
-      RETURN '"' || LOWER(P_KEY) || '":null';
-    ELSE
-      RETURN '"' || LOWER(P_KEY) || '":"' || FN_JSON_ESCAPE(P_VAL) || '"';
-    END IF;
-  END FN_JSON_PAIR;
-
-  /*=========================================================================
    [FN_JSON_PAIR_CC] — usado por los SELECT estáticos: preserva el
    camelCase de la clave tal cual se pasa (ej. "companyId"), igual que el
    FN_JSON_PAIR de PKG_MANAGEMENT_JOB_POST / PKG_MANAGEMENT_POSITION.
@@ -226,145 +211,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       O_PAGE := 1;
       O_SIZE := 20;
   END PRC_PARSE_PAGE;
-
-  /*=========================================================================
-   [PRC_GET_GENERIC_CATALOG] — Motor genérico privado (no está en el spec).
-   Lee P_TABLE_NAME (fijo, hardcoded por cada wrapper público — nunca viene
-   del cliente) vía DBMS_SQL, paginado, sin necesitar conocer sus columnas
-   de antemano. Cada columna se expone en el JSON con su nombre en minúscula.
-   Sigue en uso para: MUNICIPALITIES, PARISHES, CITIES, PAYROLL_TYPES,
-   ACCOUNT_TYPES, ID_TYPES (tablas cuya estructura real, o filtro necesario,
-   todavía no está confirmada).
-  ==========================================================================*/
-  PROCEDURE PRC_GET_GENERIC_CATALOG(P_TABLE_NAME IN VARCHAR2,
-                                    P_JSON_KEY   IN VARCHAR2,
-                                    I_JSON       IN CLOB,
-                                    O_JSON       OUT CLOB,
-                                    O_COD        OUT VARCHAR2,
-                                    O_MESSAGE    OUT VARCHAR2) IS
-    V_PAGE     NUMBER := 1;
-    V_SIZE     NUMBER := 20;
-    V_OFFSET   NUMBER;
-    V_CURSOR   INTEGER;
-    V_COL_CNT  INTEGER;
-    V_DESC_TAB DBMS_SQL.DESC_TAB3;
-    V_ROWS     INTEGER;
-    V_ARRAY    CLOB;
-    V_ROW      VARCHAR2(32767);
-    V_COUNT    PLS_INTEGER := 0;
-
-    V_OUT_STR  VARCHAR2(4000);
-    V_OUT_DAT  DATE;
-
-    C_DATE_TYPE CONSTANT PLS_INTEGER := 12; -- DBMS_SQL col_type para DATE
-  BEGIN
-    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
-    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
-
-    IF I_JSON IS NOT NULL AND DBMS_LOB.GETLENGTH(I_JSON) > 0 THEN
-      BEGIN
-        SELECT NVL(PG, 1), NVL(SZ, 20)
-          INTO V_PAGE, V_SIZE
-          FROM JSON_TABLE(I_JSON, '$'
-               COLUMNS(PG NUMBER PATH '$.page', SZ NUMBER PATH '$.size'));
-      EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-          V_PAGE := 1;
-          V_SIZE := 20;
-      END;
-    END IF;
-
-    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
-    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
-    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
-    V_OFFSET := (V_PAGE - 1) * V_SIZE;
-
-    V_CURSOR := DBMS_SQL.OPEN_CURSOR;
-
-    BEGIN
-      DBMS_SQL.PARSE(V_CURSOR,
-        'SELECT * FROM ' || P_TABLE_NAME ||
-        ' OFFSET :p_off ROWS FETCH NEXT :p_size ROWS ONLY',
-        DBMS_SQL.NATIVE);
-
-      DBMS_SQL.DESCRIBE_COLUMNS3(V_CURSOR, V_COL_CNT, V_DESC_TAB);
-
-      -- Todas las columnas se definen como texto, salvo DATE (para poder
-      -- formatearla como YYYY-MM-DD); NUMBER se convierte implícitamente
-      -- a su representación por defecto al definirla como VARCHAR2.
-      FOR I IN 1 .. V_COL_CNT LOOP
-        IF V_DESC_TAB(I).COL_TYPE = C_DATE_TYPE THEN
-          DBMS_SQL.DEFINE_COLUMN(V_CURSOR, I, V_OUT_DAT);
-        ELSE
-          DBMS_SQL.DEFINE_COLUMN(V_CURSOR, I, V_OUT_STR, 4000);
-        END IF;
-      END LOOP;
-
-      DBMS_SQL.BIND_VARIABLE(V_CURSOR, ':p_off', V_OFFSET);
-      DBMS_SQL.BIND_VARIABLE(V_CURSOR, ':p_size', V_SIZE);
-
-      V_ROWS := DBMS_SQL.EXECUTE(V_CURSOR);
-
-      DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
-      DBMS_LOB.APPEND(V_ARRAY, '[');
-
-      LOOP
-        EXIT WHEN DBMS_SQL.FETCH_ROWS(V_CURSOR) = 0;
-
-        V_ROW := '{';
-        FOR I IN 1 .. V_COL_CNT LOOP
-          IF I > 1 THEN
-            V_ROW := V_ROW || ',';
-          END IF;
-
-          IF V_DESC_TAB(I).COL_TYPE = C_DATE_TYPE THEN
-            DBMS_SQL.COLUMN_VALUE(V_CURSOR, I, V_OUT_DAT);
-            V_ROW := V_ROW || FN_JSON_PAIR(V_DESC_TAB(I).COL_NAME,
-                                           TO_CHAR(V_OUT_DAT, 'YYYY-MM-DD'));
-          ELSE
-            DBMS_SQL.COLUMN_VALUE(V_CURSOR, I, V_OUT_STR);
-            V_ROW := V_ROW || FN_JSON_PAIR(V_DESC_TAB(I).COL_NAME, V_OUT_STR);
-          END IF;
-        END LOOP;
-        V_ROW := V_ROW || '}';
-
-        IF V_COUNT > 0 THEN
-          DBMS_LOB.APPEND(V_ARRAY, ',');
-        END IF;
-        DBMS_LOB.APPEND(V_ARRAY, V_ROW);
-        V_COUNT := V_COUNT + 1;
-      END LOOP;
-
-      DBMS_SQL.CLOSE_CURSOR(V_CURSOR);
-      DBMS_LOB.APPEND(V_ARRAY, ']');
-
-      IF V_COUNT = 0 THEN
-        O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
-        O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
-        O_JSON    := NULL;
-      ELSE
-        O_JSON := '{"' || P_JSON_KEY || '":' || V_ARRAY || '}';
-      END IF;
-
-      DBMS_LOB.FREETEMPORARY(V_ARRAY);
-
-    EXCEPTION
-      WHEN OTHERS THEN
-        IF DBMS_SQL.IS_OPEN(V_CURSOR) THEN
-          DBMS_SQL.CLOSE_CURSOR(V_CURSOR);
-        END IF;
-        IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
-          DBMS_LOB.FREETEMPORARY(V_ARRAY);
-        END IF;
-        O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-        O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, P_TABLE_NAME);
-    END;
-  END PRC_GET_GENERIC_CATALOG;
-
-  /*=========================================================================
-   Wrappers públicos que siguen en el motor genérico (tabla/filtro pendiente
-   de confirmar). Solo queda PAYROLL_TYPES sin migrar.
-  ==========================================================================*/
 
   /*=========================================================================
    CITIES — INFOCENT.SPI_REF (confirmada, SELECT estático — 2026-07-27).
@@ -445,13 +291,129 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.SPI_REF');
   END PRC_GET_CITIES;
 
+  /*=========================================================================
+   PAYROLL TYPES — INFOCENT.EO_TIPO_NOMINA (confirmada, SELECT estático).
+   Se exponen TODAS las columnas de negocio de la tabla (23), solo se
+   excluyen USRCRE/FECCRE/USRACT/FECACT (auditoría, igual que el resto del
+   API). Tabla scoped por compañía (ID_EMPRESA) — companyId es filtro
+   OPCIONAL, igual que groups/branches. Nombres de campo ambiguos
+   (CLANOM, ASIGNA_FON, DEDUC_FON, FACTOR_FON, TIPO_FECHA_IN, REGRESO_HABIL,
+   ANO_360, PGM_RECIBO, FRE_SALARIO) se exponen tal cual en camelCase, sin
+   traducir, porque no se confirmó su significado de negocio exacto.
+  ==========================================================================*/
+  PROCEDURE PRC_PARSE_PAYROLL_FILTER(I_JSON      IN CLOB,
+                                     O_COMPANY_ID OUT VARCHAR2,
+                                     O_PAGE       OUT NUMBER,
+                                     O_SIZE       OUT NUMBER) IS
+  BEGIN
+    IF I_JSON IS NULL OR DBMS_LOB.GETLENGTH(I_JSON) = 0 THEN
+      O_COMPANY_ID := NULL;
+      O_PAGE       := 1;
+      O_SIZE       := 20;
+      RETURN;
+    END IF;
+
+    SELECT COMPANY_ID, NVL(PG, 1), NVL(SZ, 20)
+      INTO O_COMPANY_ID, O_PAGE, O_SIZE
+      FROM JSON_TABLE(I_JSON, '$'
+           COLUMNS(COMPANY_ID VARCHAR2(4) PATH '$.companyId',
+                   PG NUMBER PATH '$.page',
+                   SZ NUMBER PATH '$.size'));
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      O_COMPANY_ID := NULL;
+      O_PAGE       := 1;
+      O_SIZE       := 20;
+  END PRC_PARSE_PAYROLL_FILTER;
+
   PROCEDURE PRC_GET_PAYROLL_TYPES(I_JSON    IN CLOB,
                                   O_JSON    OUT CLOB,
                                   O_COD     OUT VARCHAR2,
                                   O_MESSAGE OUT VARCHAR2) IS
+    V_COMPANY_ID VARCHAR2(4);
+    V_PAGE       NUMBER;
+    V_SIZE       NUMBER;
+    V_ARRAY      CLOB;
+    V_ROW        VARCHAR2(32767);
+    V_COUNT      PLS_INTEGER := 0;
   BEGIN
-    PRC_GET_GENERIC_CATALOG('INFOCENT.EO_TIPO_NOMINA', 'payrollTypes',
-                            I_JSON, O_JSON, O_COD, O_MESSAGE);
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_PAYROLL_FILTER(I_JSON, V_COMPANY_ID, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT N.ID_EMPRESA, N.ID, N.NOMBRE, N.CLANOM, N.FRECUENCIA,
+                     N.FECHA_TOPE1, N.FECHA_TOPE2, N.FECHA_TOPE3,
+                     N.FECHA_TOPE4, N.FECHA_TOPE5, N.SALARIO_GUAR,
+                     N.CANTI_SALARIO, N.FACTOR_GUAR, N.ASIGNA_FON,
+                     N.DEDUC_FON, N.FACTOR_FON, N.FECHA_ABONO, N.REDONDEO,
+                     N.TIPO_FECHA_IN, N.REGRESO_HABIL, N.ANO_360,
+                     N.PGM_RECIBO, N.FRE_SALARIO
+                FROM INFOCENT.EO_TIPO_NOMINA N
+               WHERE (V_COMPANY_ID IS NULL OR N.ID_EMPRESA = V_COMPANY_ID)
+               ORDER BY N.ID_EMPRESA, N.ID
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.ID_EMPRESA) || ','
+               || FN_JSON_PAIR_CC('code', R.ID) || ','
+               || FN_JSON_PAIR_CC('name', R.NOMBRE) || ','
+               || FN_JSON_PAIR_CC('clanom', R.CLANOM) || ','
+               || FN_JSON_PAIR_CC('frequency', TO_CHAR(R.FRECUENCIA)) || ','
+               || FN_JSON_PAIR_CC('cutoffDate1', TO_CHAR(R.FECHA_TOPE1, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('cutoffDate2', TO_CHAR(R.FECHA_TOPE2, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('cutoffDate3', TO_CHAR(R.FECHA_TOPE3, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('cutoffDate4', TO_CHAR(R.FECHA_TOPE4, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('cutoffDate5', TO_CHAR(R.FECHA_TOPE5, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('guaranteedSalary', TO_CHAR(R.SALARIO_GUAR)) || ','
+               || FN_JSON_PAIR_CC('salaryQuantity', TO_CHAR(R.CANTI_SALARIO)) || ','
+               || FN_JSON_PAIR_CC('guaranteedFactor', TO_CHAR(R.FACTOR_GUAR)) || ','
+               || FN_JSON_PAIR_CC('asignaFon', TO_CHAR(R.ASIGNA_FON)) || ','
+               || FN_JSON_PAIR_CC('deducFon', TO_CHAR(R.DEDUC_FON)) || ','
+               || FN_JSON_PAIR_CC('factorFon', TO_CHAR(R.FACTOR_FON)) || ','
+               || FN_JSON_PAIR_CC('paymentDate', TO_CHAR(R.FECHA_ABONO, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('rounding', TO_CHAR(R.REDONDEO)) || ','
+               || FN_JSON_PAIR_CC('dateTypeIn', TO_CHAR(R.TIPO_FECHA_IN)) || ','
+               || FN_JSON_PAIR_CC('regresoHabil', R.REGRESO_HABIL) || ','
+               || FN_JSON_PAIR_CC('ano360', R.ANO_360) || ','
+               || FN_JSON_PAIR_CC('pgmRecibo', R.PGM_RECIBO) || ','
+               || FN_JSON_PAIR_CC('freSalario', R.FRE_SALARIO)
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"payrollTypes":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
+                                        'INFOCENT.EO_TIPO_NOMINA');
   END PRC_GET_PAYROLL_TYPES;
 
   /*=========================================================================
@@ -1021,7 +983,9 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
 
   /*=========================================================================
    GROUPS — INFOCENT.NMT023 (confirmada, SELECT estático).
-   Columnas: CIA_CODCIA, TNOM_TIPNOM, CODGRU, DESGRU, TIPJORN, LABDOM.
+   Columnas: CIA_CODCIA, TNOM_TIPNOM, CODGRU, DESGRU, TIPJORN, LABDOM (todos
+   los campos de negocio de la tabla; se excluyen solo las columnas de
+   auditoría USRCRE/FECCRE/USRACT/FECACT, igual que en el resto del API).
    CODGRU NO es único global: depende de CIA_CODCIA + TNOM_TIPNOM. companyId
    y payrollTypeCode son filtros OPCIONALES (si no se mandan, devuelve todo
    mezclado, igual que hoy).
