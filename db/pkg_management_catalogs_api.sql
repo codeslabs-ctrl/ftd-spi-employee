@@ -686,7 +686,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
 
     FOR R IN (SELECT N.CIA_CODCIA, N.CODLOC, N.DESLO1, N.DESLO2,
                      N.DIREC1, N.DIREC2, N.DIREC3, N.PARLOC, N.MUNLOC,
-                     N.NOMMUN, N.ENTFED, N.NOMFED, N.DISLOC, N.NOMDIS,
+                     N.NONMUN, N.ENTFED, N.NOMFED, N.DISLOC, N.NOMDIS,
                      N.SECLOC, N.CDAD_CODCIU, N.EDO_CODEDO, N.PAI_CODPAI,
                      N.ACTECO, N.DESACT, N.CAPLOC, N.NOMANT, N.DIRANT,
                      N.FECFUN, N.NROSSO, N.NROORD, N.REGMIN, N.PROLOC,
@@ -716,7 +716,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                || FN_JSON_PAIR_CC('address3', R.DIREC3) || ','
                || FN_JSON_PAIR_CC('parishCode', R.PARLOC) || ','
                || FN_JSON_PAIR_CC('municipalityCode', R.MUNLOC) || ','
-               || FN_JSON_PAIR_CC('municipalityName', R.NOMMUN) || ','
+               || FN_JSON_PAIR_CC('municipalityName', R.NONMUN) || ','
                || FN_JSON_PAIR_CC('stateCode', R.ENTFED) || ','
                || FN_JSON_PAIR_CC('stateName', R.NOMFED) || ','
                || FN_JSON_PAIR_CC('districtCode', R.DISLOC) || ','
