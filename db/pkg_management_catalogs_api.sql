@@ -21,10 +21,14 @@
 -- DBMS_SQL) y su FN_JSON_PAIR (forzaba minúsculas) se ELIMINARON del
 -- paquete por quedar sin ningún wrapper que los usara.
 --
--- Se exponen TODOS los campos de negocio de cada tabla (decisión explícita
--- 2026-07-28: no recortar a "solo lo esencial" para evitar que después se
--- pidan campos que se quitaron) — solo se excluyen las columnas de
--- auditoría (USRCRE/FECCRE/USRACT/FECACT), igual que en el resto del API.
+-- Se exponen TODOS los campos de cada tabla, incluida auditoría (decisión
+-- explícita 2026-07-28: no recortar nada para evitar que después pidan
+-- campos que se quitaron — a diferencia del resto del API, que sí excluye
+-- USRCRE/FECCRE/USRACT/FECACT). Tablas con auditoría (createdBy/createdAt/
+-- updatedBy/updatedAt en el JSON): LOCALITIES, GROUPS, BRANCHES, BANKS,
+-- ACCOUNT_TYPES, PAYROLL_TYPES. Las que no tienen esas columnas en la BD
+-- (COUNTRIES, STATES, MUNICIPALITIES, PARISHES, CITIES) no las exponen
+-- porque no existen.
 --
 -- CORRECCIÓN IMPORTANTE (2026-07-28) — LOCALITIES: la primera versión de
 -- PRC_GET_LOCALITIES usaba IDEPRO/CODPOS/NACIONAL/FECSSO/RIESSO/REGSSO/
@@ -362,7 +366,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                      N.CANTI_SALARIO, N.FACTOR_GUAR, N.ASIGNA_FON,
                      N.DEDUC_FON, N.FACTOR_FON, N.FECHA_ABONO, N.REDONDEO,
                      N.TIPO_FECHA_IN, N.REGRESO_HABIL, N.ANO_360,
-                     N.PGM_RECIBO, N.FRE_SALARIO
+                     N.PGM_RECIBO, N.FRE_SALARIO,
+                     N.USRCRE, N.FECCRE, N.USRACT, N.FECACT
                 FROM INFOCENT.EO_TIPO_NOMINA N
                WHERE (V_COMPANY_ID IS NULL OR N.ID_EMPRESA = V_COMPANY_ID)
                ORDER BY N.ID_EMPRESA, N.ID
@@ -395,7 +400,11 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                || FN_JSON_PAIR_CC('regresoHabil', R.REGRESO_HABIL) || ','
                || FN_JSON_PAIR_CC('ano360', R.ANO_360) || ','
                || FN_JSON_PAIR_CC('pgmRecibo', R.PGM_RECIBO) || ','
-               || FN_JSON_PAIR_CC('freSalario', R.FRE_SALARIO)
+               || FN_JSON_PAIR_CC('freSalario', R.FRE_SALARIO) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD'))
                || '}';
 
       DBMS_LOB.APPEND(V_ARRAY, V_ROW);
@@ -450,7 +459,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
     DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
     DBMS_LOB.APPEND(V_ARRAY, '[');
 
-    FOR R IN (SELECT A.TIPCTA, A.DESCTA
+    FOR R IN (SELECT A.TIPCTA, A.DESCTA, A.USRCRE, A.FECCRE, A.USRACT, A.FECACT
                 FROM INFOCENT.NMT022 A
                ORDER BY A.TIPCTA
               OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
@@ -461,7 +470,11 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
 
       V_ROW := '{'
                || FN_JSON_PAIR_CC('code', R.TIPCTA) || ','
-               || FN_JSON_PAIR_CC('name', R.DESCTA)
+               || FN_JSON_PAIR_CC('name', R.DESCTA) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD'))
                || '}';
 
       DBMS_LOB.APPEND(V_ARRAY, V_ROW);
@@ -694,7 +707,9 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                      N.NTRAO1, N.NTRAE1, N.NTRAO2, N.NTRAE2,
                      N.NTRAO3, N.NTRAE3, N.SIGLAS, N.NUMRIF, N.NUMNIT,
                      N.NUMTLF, N.NUMFAX, N.E_MAIL, N.HORSEM, N.TURNOS,
-                     N.NOMINF, N.CGOINF, N.IDEINF, N.NILCIA, N.IDEPRO,
+                     N.NOMINF, N.CGOINF,
+                     N.USRCRE, N.FECCRE, N.USRACT, N.FECACT,
+                     N.IDEINF, N.NILCIA, N.IDEPRO,
                      N.CODPOS, N.NACIONAL, N.FECSSO, N.RIESSO, N.REGSSO,
                      N.OBSSSO
                 FROM INFOCENT.NMT002 N
@@ -755,6 +770,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                || FN_JSON_PAIR_CC('shifts', TO_CHAR(R.TURNOS)) || ','
                || FN_JSON_PAIR_CC('contactName', R.NOMINF) || ','
                || FN_JSON_PAIR_CC('contactPosition', R.CGOINF) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
                || FN_JSON_PAIR_CC('contactIdType', R.IDEINF) || ','
                || FN_JSON_PAIR_CC('nilcia', R.NILCIA) || ','
                || FN_JSON_PAIR_CC('idepro', R.IDEPRO) || ','
@@ -1146,6 +1165,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
     DBMS_LOB.APPEND(V_ARRAY, '[');
 
     FOR R IN (SELECT G.CIA_CODCIA, G.TNOM_TIPNOM, G.CODGRU, G.DESGRU,
+                     G.USRCRE, G.FECCRE, G.USRACT, G.FECACT,
                      G.TIPJORN, G.LABDOM
                 FROM INFOCENT.NMT023 G
                WHERE (V_COMPANY_ID IS NULL OR G.CIA_CODCIA = V_COMPANY_ID)
@@ -1163,6 +1183,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                || FN_JSON_PAIR_CC('payrollTypeCode', R.TNOM_TIPNOM) || ','
                || FN_JSON_PAIR_CC('code', R.CODGRU) || ','
                || FN_JSON_PAIR_CC('description', R.DESGRU) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
                || FN_JSON_PAIR_CC('workdayTypeCode', R.TIPJORN) || ','
                || FN_JSON_PAIR_CC('sundayWorkFlag', R.LABDOM)
                || '}';
@@ -1244,7 +1268,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
     DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
     DBMS_LOB.APPEND(V_ARRAY, '[');
 
-    FOR R IN (SELECT B.CIA_CODCIA, B.CODSUC, B.DESSUC, B.CODCTB, B.CODUBI
+    FOR R IN (SELECT B.CIA_CODCIA, B.CODSUC, B.DESSUC, B.CODCTB,
+                     B.USRCRE, B.FECCRE, B.USRACT, B.FECACT, B.CODUBI
                 FROM INFOCENT.NMT038 B
                WHERE (V_COMPANY_ID IS NULL OR B.CIA_CODCIA = V_COMPANY_ID)
                ORDER BY B.CIA_CODCIA, B.CODSUC
@@ -1259,6 +1284,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                || FN_JSON_PAIR_CC('code', R.CODSUC) || ','
                || FN_JSON_PAIR_CC('name', R.DESSUC) || ','
                || FN_JSON_PAIR_CC('accountingCode', R.CODCTB) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
                || FN_JSON_PAIR_CC('locationCode', R.CODUBI)
                || '}';
 
@@ -1347,7 +1376,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                      K.NRORIF, K.DIREC1, K.DIREC2, K.DIREC3,
                      K.CDAD_CODCIU, K.EDO_CODEDO, K.PAI_CODPAI,
                      K.NROTL1, K.NROTL2, K.NROFAX, K.NROCTA, K.CTACON,
-                     K.NOMCON, K.TCTA_TIPCTA, K.NOCTTO, K.CODRIE
+                     K.NOMCON, K.TCTA_TIPCTA, K.NOCTTO,
+                     K.USRCRE, K.FECCRE, K.USRACT, K.FECACT, K.CODRIE
                 FROM INFOCENT.NMT020 K
                WHERE K.TIPI_CODTIP = C_BANK_TYPE_CODE
                  AND (V_COMPANY_ID IS NULL OR K.CIA_CODCIA = V_COMPANY_ID)
@@ -1378,6 +1408,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
                || FN_JSON_PAIR_CC('accountHolderName', R.NOMCON) || ','
                || FN_JSON_PAIR_CC('accountTypeCode', R.TCTA_TIPCTA) || ','
                || FN_JSON_PAIR_CC('contractNumber', R.NOCTTO) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
                || FN_JSON_PAIR_CC('riskCode', R.CODRIE)
                || '}';
 

@@ -24,7 +24,7 @@ Convención de nombres: procedimientos/funciones del paquete en inglés (`PRC_GE
 
 **Migración a SELECT estático (2026-07-27/28):** igual que se hizo con `job-post`, cada wrapper usa un `SELECT` estático explícito sobre su tabla real — mismo estilo que `position`/`job-post` (`PRC_PARSE_*_FILTER` + `FOR` loop + `FN_JSON_PAIR_CC`, que preserva camelCase en las claves del JSON). **Los 12 catálogos ya están migrados**; el motor genérico (`PRC_GET_GENERIC_CATALOG`, `DBMS_SQL`) y su `FN_JSON_PAIR` (forzaba minúsculas) se eliminaron del paquete por quedar sin ningún wrapper que los usara.
 
-**Política de campos (2026-07-28):** se exponen **todas** las columnas de negocio de cada tabla — decisión explícita de no recortar a "solo lo esencial" para evitar que después pidan campos que se quitaron. Solo se excluyen las columnas de auditoría (`USRCRE`/`FECCRE`/`USRACT`/`FECACT`), igual que en el resto del API.
+**Política de campos (2026-07-28):** se exponen **todas** las columnas de cada tabla, incluida auditoría — decisión explícita de no recortar nada para evitar que después pidan campos que se quitaron (a diferencia del resto del API, que sí excluye `USRCRE`/`FECCRE`/`USRACT`/`FECACT`). Se agregaron como `createdBy`/`createdAt`/`updatedBy`/`updatedAt` en los catálogos cuya tabla real tiene esas columnas: `localities`, `groups`, `branches`, `banks`, `account-types`, `payroll-types`. Los que no las tienen en la BD (`countries`, `states`, `municipalities`, `parishes`, `cities`) no las exponen porque no existen.
 
 **Los 12 catálogos migrados a SELECT estático, verificados contra QA Colombia real:**
 - `INFOCENT.SPI_PAISES` (→ `countries`): `CODIGO`, `NOMBRE`. Tabla plana, sin filtros. ✅ Verificado (Postman, CO).
