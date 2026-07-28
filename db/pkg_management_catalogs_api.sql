@@ -827,7 +827,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
    país + entidad (mismo patrón que STATES) — countryCode/stateCode son
    filtros OPCIONALES.
   ==========================================================================*/
-  PROCEDURE PRC_PARSE_MUNICIPALITIES_FILTER(I_JSON        IN CLOB,
+  PROCEDURE PRC_PARSE_MUNIC_FILTER(I_JSON        IN CLOB,
                                             O_COUNTRY_CODE OUT VARCHAR2,
                                             O_STATE_CODE   OUT VARCHAR2,
                                             O_PAGE         OUT NUMBER,
@@ -854,7 +854,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       O_STATE_CODE   := NULL;
       O_PAGE         := 1;
       O_SIZE         := 20;
-  END PRC_PARSE_MUNICIPALITIES_FILTER;
+  END PRC_PARSE_MUNIC_FILTER;
 
   PROCEDURE PRC_GET_MUNICIPALITIES(I_JSON    IN CLOB,
                                    O_JSON    OUT CLOB,
@@ -871,8 +871,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
     O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
     O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
 
-    PRC_PARSE_MUNICIPALITIES_FILTER(I_JSON, V_COUNTRY_CODE, V_STATE_CODE,
-                                    V_PAGE, V_SIZE);
+    PRC_PARSE_MUNIC_FILTER(I_JSON, V_COUNTRY_CODE, V_STATE_CODE,
+                          V_PAGE, V_SIZE);
     IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
     IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
     IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
