@@ -2,7 +2,7 @@
   "info": {
     "name": "FTD SPI Catalogs",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "12 catálogos de solo lectura, un solo paquete Oracle compartido (pkg_management_catalogs). Todos con el mismo contrato: POST /catalogs/<key>/list con { page, size } -> { page, size, items }.\n\nVariables: {{baseUrl}}, {{clientId}}, {{clientSecret}}. Ejecutar Auth > Get Token primero. Soporta cifrado P2C igual que el resto del API (no ejercitado aquí, ver colección Employee para el patrón)."
+    "description": "12 catálogos de solo lectura, un solo paquete Oracle compartido (pkg_management_catalogs). Todos con el mismo contrato: POST /catalogs/<key>/list con { page, size } -> { page, size, items }.\n\nMismo patrón P2C que Employee/Additional CRUD: el folder Catalogs cifra el body en RequestJson (urlencoded) y descifra ResponseJson en el test. Variables: {{baseUrl}}, {{clientId}}, {{clientSecret}}, {{payloadKey}}. Ejecutar Auth > Get Token primero.\n\n{{payloadKey}} debe coincidir con PAYLOAD_ENCRYPTION_KEY del backend. Si el ambiente tiene REQUIRE_ENCRYPTED_PAYLOAD=true, un request sin RequestJson responde 400 \"Encrypted payload required\" — por eso esta colección va cifrada por defecto (antes iba en JSON plano)."
   },
   "variable": [
     {
@@ -18,7 +18,15 @@
       "value": "local-secret-2026"
     },
     {
+      "key": "payloadKey",
+      "value": "portal-shared-key-2026"
+    },
+    {
       "key": "token",
+      "value": ""
+    },
+    {
+      "key": "encRequest",
       "value": ""
     }
   ],
@@ -58,19 +66,39 @@
       ]
     },
     {
-      "name": "Catalogs",
+      "name": "Catalogs (P2C, cifrado)",
+      "description": "Cifrado de payload con CryptoJS.AES. Pre-request cifra en RequestJson; test descifra ResponseJson.",
       "item": [
         {
-          "name": "List Municipalities (Municipios) (200)",
+          "name": "List Municipalities (Municipios) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -80,7 +108,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -88,27 +116,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/municipalities/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Countries (Países) (200)",
+          "name": "List Countries (Países) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -118,7 +170,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -126,27 +178,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/countries/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Parishes (Parroquias) (200)",
+          "name": "List Parishes (Parroquias) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -156,7 +232,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -164,27 +240,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/parishes/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Localities (Localidades) (200)",
+          "name": "List Localities (Localidades) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -194,7 +294,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -202,27 +302,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/localities/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Cities (validación de ciudad) (200)",
+          "name": "List Cities (validación de ciudad) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -232,7 +356,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -240,27 +364,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/cities/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List States (entidades federales) (200)",
+          "name": "List States (entidades federales) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -270,7 +418,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -278,27 +426,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/states/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Payroll types (tipos de nómina) (200)",
+          "name": "List Payroll types (tipos de nómina) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -308,7 +480,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -316,27 +488,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/payroll-types/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Groups (grupos) (200)",
+          "name": "List Groups (grupos) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -346,7 +542,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -354,27 +550,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/groups/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Branches (sucursales) (200)",
+          "name": "List Branches (sucursales) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -384,7 +604,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -392,27 +612,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/branches/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Banks (validación de banco) (200)",
+          "name": "List Banks (validación de banco) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -422,7 +666,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -430,27 +674,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/banks/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List Account types (tipos de cuenta) (200)",
+          "name": "List Account types (tipos de cuenta) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -460,7 +728,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -468,27 +736,51 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/account-types/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "List ID types (tipos de identificación) (200)",
+          "name": "List ID types (tipos de identificación) (encrypted 200)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const payload = { page: 1, size: 20 };",
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "// Igual que el front: CryptoJS.AES.encrypt(JSON.stringify(data), KEY).toString()",
+                  "const cipher = CryptoJS.AES.encrypt(JSON.stringify(payload), key).toString();",
+                  "pm.collectionVariables.set('encRequest', cipher);",
+                  "console.log('RequestJson (cifrado):', cipher.slice(0, 24) + '...');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('trae paginacion', () => pm.expect(pm.response.json().page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "pm.test('respuesta viene cifrada (ResponseJson)', () => pm.expect(enc).to.be.a('string'));",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
                 ]
               }
             }
@@ -498,7 +790,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/x-www-form-urlencoded"
               },
               {
                 "key": "Authorization",
@@ -506,13 +798,59 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/id-types/list",
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"page\": 1,\n  \"size\": 20\n}"
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "{{encRequest}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Invalid cipher (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "X-Country-Code",
+                "value": "CO"
+              }
+            ],
+            "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/countries/list",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "RequestJson",
+                  "value": "not-a-valid-cipher"
+                }
+              ]
             }
           }
         }
@@ -543,7 +881,7 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/countries/list",
@@ -647,7 +985,7 @@
               },
               {
                 "key": "X-Country-Code",
-                "value": "VE"
+                "value": "CO"
               }
             ],
             "url": "{{baseUrl}}/ftd-spi-employee/rest/catalogs/does-not-exist/list",
