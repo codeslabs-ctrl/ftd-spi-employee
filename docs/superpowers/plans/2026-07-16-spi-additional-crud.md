@@ -12,7 +12,7 @@
 - Repositories are self-contained (each has its own `withConn`/`readLob`/`callPkg`/`assertPkgSuccess`), just like `EmployeesRepository`. We intentionally do NOT introduce a shared base class — the user asked to keep it identical to how employees was built.
 - All PKG defaults are unqualified package names (resolved in the connection schema `people_one`, where the employee PKG also lives).
 - Every module uses the `FAKE_DB` factory from `employees.module.ts`.
-- Run tests from the project root: `cd C:/Users/cerodriguez/Desktop/DOCUMENTACIONES/PERSONALES/ftd-spi-employee`.
+- Run tests from the project root: `cd ftd-spi-employee`.
 
 ---
 
