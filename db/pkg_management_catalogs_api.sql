@@ -12,39 +12,47 @@
 -- Cities, States, Payroll types, Groups, Branches, Banks, Account types,
 -- ID types). Cada catálogo es de solo lectura (GET).
 --
--- MIGRACIÓN A SELECT ESTÁTICO (2026-07-27): igual que se hizo con
--- PKG_MANAGEMENT_JOB_POST, en cuanto se confirma la estructura real de una
--- tabla (vía DESCRIBE en QA) su wrapper deja de usar el motor genérico
--- (DBMS_SQL) y pasa a un SELECT estático explícito, en el mismo estilo que
--- PKG_MANAGEMENT_POSITION / PKG_MANAGEMENT_JOB_POST (PRC_PARSE_*_FILTER +
--- FOR loop + FN_JSON_PAIR_CC) — más legible y mantenible que la
--- introspección genérica. Confirmadas y ya migradas (11/12): COUNTRIES,
--- STATES, LOCALITIES, BANKS, GROUPS, BRANCHES, ACCOUNT_TYPES, ID_TYPES,
--- MUNICIPALITIES, PARISHES, CITIES.
+-- MIGRACIÓN A SELECT ESTÁTICO (2026-07-27/28): igual que se hizo con
+-- PKG_MANAGEMENT_JOB_POST, cada wrapper usa un SELECT estático explícito
+-- sobre su tabla real, en el mismo estilo que PKG_MANAGEMENT_POSITION /
+-- PKG_MANAGEMENT_JOB_POST (PRC_PARSE_*_FILTER + FOR loop + FN_JSON_PAIR_CC)
+-- — más legible y mantenible que la introspección genérica. LOS 12
+-- CATÁLOGOS YA ESTÁN MIGRADOS; el motor genérico (PRC_GET_GENERIC_CATALOG,
+-- DBMS_SQL) y su FN_JSON_PAIR (forzaba minúsculas) se ELIMINARON del
+-- paquete por quedar sin ningún wrapper que los usara.
 --
--- Sigue en el motor genérico (PRC_GET_GENERIC_CATALOG) mientras no se
--- confirme su estructura real (pendiente de script de tabla, 2026-07-27):
--- PAYROLL_TYPES (INFOCENT.EO_TIPO_NOMINA) — última tabla sin confirmar.
+-- Se exponen TODOS los campos de negocio de cada tabla (decisión explícita
+-- 2026-07-28: no recortar a "solo lo esencial" para evitar que después se
+-- pidan campos que se quitaron) — solo se excluyen las columnas de
+-- auditoría (USRCRE/FECCRE/USRACT/FECACT), igual que en el resto del API.
 --
--- CITIES ya está migrada a SELECT estático sobre INFOCENT.SPI_REF, pero
--- TODAVÍA SIN FILTRO por DOMAIN: se revisaron ~50 dominios de esa tabla
--- (nacionalidades, monedas, áreas administrativas, config. de nómina...) y
--- no se encontró uno que corresponda a ciudades. Pendiente de confirmar con
--- la persona que dio la información original si el mapeo es correcto o si
--- las ciudades viven en otra tabla (ver comentario en PRC_GET_CITIES).
+-- CORRECCIÓN IMPORTANTE (2026-07-28) — LOCALITIES: la primera versión de
+-- PRC_GET_LOCALITIES usaba IDEPRO/CODPOS/NACIONAL/FECSSO/RIESSO/REGSSO/
+-- OBSSSO, que resultaron ser columnas LEGACY al final de INFOCENT.NMT002
+-- (casi siempre NULL en filas reales) — esas 7 columnas eran la "cola" de
+-- un DESCRIBE con scroll, no la tabla completa. La tabla real tiene ~57
+-- columnas de negocio (localidad/sucursal física: nombre, dirección,
+-- jerarquía geográfica, actividad económica, horarios, contacto...). Ya
+-- corregido con el DESCRIBE completo contra QA Colombia real.
+--
+-- CITIES sigue sin filtro por DOMAIN: INFOCENT.SPI_REF es una tabla de
+-- dominios genéricos compartida (se revisaron ~50 dominios: nacionalidades,
+-- monedas, áreas administrativas, config. de nómina...) y no se encontró
+-- uno que corresponda a ciudades. Pendiente de confirmar con la persona que
+-- dio la información original si el mapeo es correcto o si las ciudades
+-- viven en otra tabla (ver comentario en PRC_GET_CITIES).
 --
 -- SUPUESTOS PENDIENTES DE CONFIRMAR (ver db/README.md para detalle completo):
 --   * BANKS (INFOCENT.NMT020): se asume TIPI_CODTIP = '01' para "banco"
---     (visto en muestra: DAVIVIENDA/BANCOLOMBIA con ese código; 'RP' y 'PE'
---     son aseguradora de riesgos y fondo de pensión, se excluyen). Falta
---     confirmación explícita. NOCTTO se expone como "contractNumber" —
---     nombre de campo no confirmado semánticamente.
---   * GROUPS (INFOCENT.NMT023) y BRANCHES (INFOCENT.NMT038): ambas están
---     scoped por CIA_CODCIA (compañía); se agregó companyId como filtro
---     OPCIONAL (si no se manda, se devuelve sin filtrar por compañía — se
---     puede volver obligatorio cuando se confirme el contrato exacto).
---   * STATES (INFOCENT.SPI_ENTIDAD_FEDERAL): tabla multi-país; se agregó
---     countryCode como filtro OPCIONAL por la misma razón.
+--     (confirmado con varias muestras reales: DAVIVIENDA/BANCOLOMBIA/BANCO
+--     DE BOGOTÁ con ese código; 'RP'/'PE'/'CA'/'SA' son aseguradora de
+--     riesgos, fondo de pensión, caja de compensación y EPS — se excluyen).
+--     NOCTTO se expone como "contractNumber" — nombre no confirmado.
+--   * GROUPS (NMT023), BRANCHES (NMT038), PAYROLL_TYPES (EO_TIPO_NOMINA) y
+--     LOCALITIES (NMT002): todas scoped por CIA_CODCIA (compañía);
+--     companyId es filtro OPCIONAL (si no se manda, devuelve todo).
+--   * STATES (SPI_ENTIDAD_FEDERAL): tabla multi-país; countryCode es
+--     filtro OPCIONAL por la misma razón.
 --   * "Validar reingreso" (a partir de la cédula) NO está incluido en este
 --     paquete: falta la consulta SQL (pendiente de Jhon). Se agrega cuando
 --     llegue.
@@ -613,25 +621,62 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
   END PRC_GET_COUNTRIES;
 
   /*=========================================================================
-   LOCALITIES — INFOCENT.NMT002 (confirmada, SELECT estático).
-   Columnas: IDEPRO, CODPOS, NACIONAL, FECSSO (DATE), RIESSO, REGSSO, OBSSSO.
-   Sin filtros (catálogo plano); nombres de campo se mantienen tal cual la
-   columna (en minúscula) porque no se confirmó su significado de negocio.
+   LOCALITIES — INFOCENT.NMT002 (RE-CONFIRMADA 2026-07-28, DESCRIBE completo
+   contra QA Colombia). CORRECCIÓN: la versión anterior de este wrapper
+   usaba solo IDEPRO/CODPOS/NACIONAL/FECSSO/RIESSO/REGSSO/OBSSSO, que
+   resultaron ser columnas LEGACY al final de la tabla, casi siempre NULL
+   en filas reales — esas 7 columnas eran la "cola" de un DESCRIBE con
+   scroll, no la tabla completa. La tabla real tiene ~57 columnas de
+   negocio (localidad/sucursal física de una compañía: nombre, dirección,
+   jerarquía geográfica, actividad económica, horarios, contacto...).
+   Se exponen todas menos auditoría (USRCRE/FECCRE/USRACT/FECACT), igual
+   que el resto del paquete. companyId es filtro OPCIONAL (tabla scoped por
+   CIA_CODCIA, igual que groups/branches/payroll-types).
+   Nombres de campo ambiguos (caploc, nrosso, nroord, regmin, proloc,
+   hefeob/hefeem/defeob/defeem, ntrao1-3/ntrae1-3, ideinf, nilcia, idepro,
+   nacional) se exponen en camelCase literal del nombre de columna, sin
+   traducir, porque no se confirmó su significado de negocio exacto.
   ==========================================================================*/
+  PROCEDURE PRC_PARSE_LOCALITIES_FILTER(I_JSON      IN CLOB,
+                                        O_COMPANY_ID OUT VARCHAR2,
+                                        O_PAGE       OUT NUMBER,
+                                        O_SIZE       OUT NUMBER) IS
+  BEGIN
+    IF I_JSON IS NULL OR DBMS_LOB.GETLENGTH(I_JSON) = 0 THEN
+      O_COMPANY_ID := NULL;
+      O_PAGE       := 1;
+      O_SIZE       := 20;
+      RETURN;
+    END IF;
+
+    SELECT COMPANY_ID, NVL(PG, 1), NVL(SZ, 20)
+      INTO O_COMPANY_ID, O_PAGE, O_SIZE
+      FROM JSON_TABLE(I_JSON, '$'
+           COLUMNS(COMPANY_ID VARCHAR2(4) PATH '$.companyId',
+                   PG NUMBER PATH '$.page',
+                   SZ NUMBER PATH '$.size'));
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      O_COMPANY_ID := NULL;
+      O_PAGE       := 1;
+      O_SIZE       := 20;
+  END PRC_PARSE_LOCALITIES_FILTER;
+
   PROCEDURE PRC_GET_LOCALITIES(I_JSON    IN CLOB,
                                O_JSON    OUT CLOB,
                                O_COD     OUT VARCHAR2,
                                O_MESSAGE OUT VARCHAR2) IS
-    V_PAGE  NUMBER;
-    V_SIZE  NUMBER;
-    V_ARRAY CLOB;
-    V_ROW   VARCHAR2(32767);
-    V_COUNT PLS_INTEGER := 0;
+    V_COMPANY_ID VARCHAR2(4);
+    V_PAGE       NUMBER;
+    V_SIZE       NUMBER;
+    V_ARRAY      CLOB;
+    V_ROW        VARCHAR2(32767);
+    V_COUNT      PLS_INTEGER := 0;
   BEGIN
     O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
     O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
 
-    PRC_PARSE_PAGE(I_JSON, V_PAGE, V_SIZE);
+    PRC_PARSE_LOCALITIES_FILTER(I_JSON, V_COMPANY_ID, V_PAGE, V_SIZE);
     IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
     IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
     IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
@@ -639,15 +684,22 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
     DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
     DBMS_LOB.APPEND(V_ARRAY, '[');
 
-    FOR R IN (SELECT N.IDEPRO,
-                     N.CODPOS,
-                     N.NACIONAL,
-                     N.FECSSO,
-                     N.RIESSO,
-                     N.REGSSO,
+    FOR R IN (SELECT N.CIA_CODCIA, N.CODLOC, N.DESLO1, N.DESLO2,
+                     N.DIREC1, N.DIREC2, N.DIREC3, N.PARLOC, N.MUNLOC,
+                     N.NOMMUN, N.ENTFED, N.NOMFED, N.DISLOC, N.NOMDIS,
+                     N.SECLOC, N.CDAD_CODCIU, N.EDO_CODEDO, N.PAI_CODPAI,
+                     N.ACTECO, N.DESACT, N.CAPLOC, N.NOMANT, N.DIRANT,
+                     N.FECFUN, N.NROSSO, N.NROORD, N.REGMIN, N.PROLOC,
+                     N.HEFEOB, N.HEFEEM, N.DEFEOB, N.DEFEEM,
+                     N.NTRAO1, N.NTRAE1, N.NTRAO2, N.NTRAE2,
+                     N.NTRAO3, N.NTRAE3, N.SIGLAS, N.NUMRIF, N.NUMNIT,
+                     N.NUMTLF, N.NUMFAX, N.E_MAIL, N.HORSEM, N.TURNOS,
+                     N.NOMINF, N.CGOINF, N.IDEINF, N.NILCIA, N.IDEPRO,
+                     N.CODPOS, N.NACIONAL, N.FECSSO, N.RIESSO, N.REGSSO,
                      N.OBSSSO
                 FROM INFOCENT.NMT002 N
-               ORDER BY N.IDEPRO
+               WHERE (V_COMPANY_ID IS NULL OR N.CIA_CODCIA = V_COMPANY_ID)
+               ORDER BY N.CIA_CODCIA, N.CODLOC
               OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
     LOOP
       IF V_COUNT > 0 THEN
@@ -655,13 +707,63 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       END IF;
 
       V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.CIA_CODCIA) || ','
+               || FN_JSON_PAIR_CC('code', R.CODLOC) || ','
+               || FN_JSON_PAIR_CC('name', R.DESLO1) || ','
+               || FN_JSON_PAIR_CC('name2', R.DESLO2) || ','
+               || FN_JSON_PAIR_CC('address1', R.DIREC1) || ','
+               || FN_JSON_PAIR_CC('address2', R.DIREC2) || ','
+               || FN_JSON_PAIR_CC('address3', R.DIREC3) || ','
+               || FN_JSON_PAIR_CC('parishCode', R.PARLOC) || ','
+               || FN_JSON_PAIR_CC('municipalityCode', R.MUNLOC) || ','
+               || FN_JSON_PAIR_CC('municipalityName', R.NOMMUN) || ','
+               || FN_JSON_PAIR_CC('stateCode', R.ENTFED) || ','
+               || FN_JSON_PAIR_CC('stateName', R.NOMFED) || ','
+               || FN_JSON_PAIR_CC('districtCode', R.DISLOC) || ','
+               || FN_JSON_PAIR_CC('districtName', R.NOMDIS) || ','
+               || FN_JSON_PAIR_CC('sectionCode', R.SECLOC) || ','
+               || FN_JSON_PAIR_CC('cityCode', R.CDAD_CODCIU) || ','
+               || FN_JSON_PAIR_CC('edoCodedo', R.EDO_CODEDO) || ','
+               || FN_JSON_PAIR_CC('countryCode', R.PAI_CODPAI) || ','
+               || FN_JSON_PAIR_CC('economicActivityCode', R.ACTECO) || ','
+               || FN_JSON_PAIR_CC('economicActivityName', R.DESACT) || ','
+               || FN_JSON_PAIR_CC('caploc', TO_CHAR(R.CAPLOC)) || ','
+               || FN_JSON_PAIR_CC('previousName', R.NOMANT) || ','
+               || FN_JSON_PAIR_CC('previousAddress', R.DIRANT) || ','
+               || FN_JSON_PAIR_CC('foundationDate', TO_CHAR(R.FECFUN, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('nrosso', R.NROSSO) || ','
+               || FN_JSON_PAIR_CC('nroord', R.NROORD) || ','
+               || FN_JSON_PAIR_CC('regmin', R.REGMIN) || ','
+               || FN_JSON_PAIR_CC('proloc', R.PROLOC) || ','
+               || FN_JSON_PAIR_CC('hefeob', TO_CHAR(R.HEFEOB)) || ','
+               || FN_JSON_PAIR_CC('hefeem', TO_CHAR(R.HEFEEM)) || ','
+               || FN_JSON_PAIR_CC('defeob', TO_CHAR(R.DEFEOB)) || ','
+               || FN_JSON_PAIR_CC('defeem', TO_CHAR(R.DEFEEM)) || ','
+               || FN_JSON_PAIR_CC('ntrao1', TO_CHAR(R.NTRAO1)) || ','
+               || FN_JSON_PAIR_CC('ntrae1', TO_CHAR(R.NTRAE1)) || ','
+               || FN_JSON_PAIR_CC('ntrao2', TO_CHAR(R.NTRAO2)) || ','
+               || FN_JSON_PAIR_CC('ntrae2', TO_CHAR(R.NTRAE2)) || ','
+               || FN_JSON_PAIR_CC('ntrao3', TO_CHAR(R.NTRAO3)) || ','
+               || FN_JSON_PAIR_CC('ntrae3', TO_CHAR(R.NTRAE3)) || ','
+               || FN_JSON_PAIR_CC('abbreviation', R.SIGLAS) || ','
+               || FN_JSON_PAIR_CC('taxIdRif', R.NUMRIF) || ','
+               || FN_JSON_PAIR_CC('taxIdNit', R.NUMNIT) || ','
+               || FN_JSON_PAIR_CC('phone', R.NUMTLF) || ','
+               || FN_JSON_PAIR_CC('fax', R.NUMFAX) || ','
+               || FN_JSON_PAIR_CC('email', R.E_MAIL) || ','
+               || FN_JSON_PAIR_CC('weeklyHours', TO_CHAR(R.HORSEM)) || ','
+               || FN_JSON_PAIR_CC('shifts', TO_CHAR(R.TURNOS)) || ','
+               || FN_JSON_PAIR_CC('contactName', R.NOMINF) || ','
+               || FN_JSON_PAIR_CC('contactPosition', R.CGOINF) || ','
+               || FN_JSON_PAIR_CC('contactIdType', R.IDEINF) || ','
+               || FN_JSON_PAIR_CC('nilcia', R.NILCIA) || ','
                || FN_JSON_PAIR_CC('idepro', R.IDEPRO) || ','
-               || FN_JSON_PAIR_CC('codpos', R.CODPOS) || ','
+               || FN_JSON_PAIR_CC('postalCode', R.CODPOS) || ','
                || FN_JSON_PAIR_CC('nacional', R.NACIONAL) || ','
-               || FN_JSON_PAIR_CC('fecsso', TO_CHAR(R.FECSSO, 'YYYY-MM-DD')) || ','
-               || FN_JSON_PAIR_CC('riesso', R.RIESSO) || ','
-               || FN_JSON_PAIR_CC('regsso', R.REGSSO) || ','
-               || FN_JSON_PAIR_CC('obssso', R.OBSSSO)
+               || FN_JSON_PAIR_CC('socialSecurityDate', TO_CHAR(R.FECSSO, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('socialSecurityRisk', TO_CHAR(R.RIESSO)) || ','
+               || FN_JSON_PAIR_CC('socialSecurityRegistration', R.REGSSO) || ','
+               || FN_JSON_PAIR_CC('socialSecurityObservations', R.OBSSSO)
                || '}';
 
       DBMS_LOB.APPEND(V_ARRAY, V_ROW);
