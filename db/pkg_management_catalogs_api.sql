@@ -11,11 +11,11 @@
 -- técnico acotado. Compilar PKG_GLOBAL_ERRORS antes que este paquete.
 --
 -- 13ª: PRC_VALIDATE_REENTRY ("Validar reingreso", 2026-07-28) — a partir de
--- la cédula, valida si es reingreso y corrige INFOCENT.FTD_INGRESOS si no
+-- la cédula, valida si es reingreso y corrige CORSOX.FTD_INGRESOS si no
 -- coincide con lo declarado (lógica de Jhon). Es el ÚNICO procedimiento de
 -- este paquete que escribe (UPDATE + COMMIT); los otros 12 siguen siendo de
--- solo lectura. Ver comentario junto al body para el supuesto pendiente de
--- confirmar sobre el esquema de FTD_INGRESOS.
+-- solo lectura. Esquema de FTD_INGRESOS confirmado 2026-07-29: CORSOX (no
+-- INFOCENT).
 --
 -- 14ª-19ª (2026-07-29): INFOCENT.NMT035 (PRC_GET_TERMINATION_REASONS,
 -- causales de retiro) y NMT036 (PRC_GET_CHANGE_REASONS, motivos de cambio)
@@ -135,7 +135,7 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_CATALOGS AS
                                    O_MESSAGE OUT VARCHAR2);
 
   -- ÚNICO procedimiento de este paquete que NO es de solo lectura: valida
-  -- si una cédula es reingreso y corrige INFOCENT.FTD_INGRESOS si el valor
+  -- si una cédula es reingreso y corrige CORSOX.FTD_INGRESOS si el valor
   -- declarado por el caller no coincide con lo que hay en EO_PERSONA/
   -- TA_RELACION_LABORAL (lógica de Jhon, ver comentario en el body).
   PROCEDURE PRC_VALIDATE_REENTRY(I_JSON    IN CLOB,
@@ -2034,16 +2034,15 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
 
   /*=========================================================================
    VALIDAR REINGRESO — a partir de la cédula (numIden), identifica si es o
-   no un reingreso y corrige INFOCENT.FTD_INGRESOS si lo que declaró el
+   no un reingreso y corrige CORSOX.FTD_INGRESOS si lo que declaró el
    caller (reingreso: 'SI'/'NO') no coincide con lo que existe en
    EO_PERSONA/TA_RELACION_LABORAL. Lógica tal como la dio Jhon — único
    procedimiento de este paquete que escribe (UPDATE + COMMIT); los otros 12
    son de solo lectura.
 
-   SUPUESTO PENDIENTE DE CONFIRMAR: se asume INFOCENT.FTD_INGRESOS (mismo
-   esquema que el resto de tablas de este paquete) con columnas
-   NUMERO_DOCUMENTO y REINGRESO — Jhon las pasó sin calificar esquema.
-   Ajustar el nombre de tabla si en realidad vive en otro esquema.
+   Tabla confirmada 2026-07-29: CORSOX.FTD_INGRESOS (no INFOCENT — Jhon la
+   pasó sin calificar esquema, se asumió INFOCENT por defecto y falló en
+   compilación real con ORA-00942; corregido a CORSOX).
 
    Contrato de entrada: { "numIden": "<cédula>", "reingreso": "SI"|"NO" }
    (el "reingreso" que el caller cree que es, ANTES de validar).
@@ -2101,7 +2100,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
 
     IF V_DECLARED = 'SI' AND V_EXISTE = 0 THEN
       -- El caller dijo que era reingreso, pero no hay rastro previo: corrige.
-      UPDATE INFOCENT.FTD_INGRESOS
+      UPDATE CORSOX.FTD_INGRESOS
          SET REINGRESO = 'NO'
        WHERE NUMERO_DOCUMENTO = V_NUM_IDEN;
       COMMIT;
@@ -2110,7 +2109,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       V_CORRECTED := 'S';
     ELSIF V_DECLARED = 'NO' AND V_EXISTE > 0 THEN
       -- El caller dijo que NO era reingreso, pero sí existe rastro previo: corrige.
-      UPDATE INFOCENT.FTD_INGRESOS
+      UPDATE CORSOX.FTD_INGRESOS
          SET REINGRESO = 'SI'
        WHERE NUMERO_DOCUMENTO = V_NUM_IDEN;
       COMMIT;
@@ -2135,7 +2134,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
     WHEN OTHERS THEN
       ROLLBACK;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.FTD_INGRESOS');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'CORSOX.FTD_INGRESOS');
   END PRC_VALIDATE_REENTRY;
 
 END PKG_MANAGEMENT_CATALOGS;
