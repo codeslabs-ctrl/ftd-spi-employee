@@ -27,6 +27,7 @@ API RESTful multi-tenant para gestión de empleados SPI (Farmatodo Digital).
 | POST | `/ftd-spi-employee/rest/org-unit/get` | org-unit |
 | POST | `/ftd-spi-employee/rest/org-unit/list` | `{ page, size, items }` |
 | POST | `/ftd-spi-employee/rest/catalogs/<catálogo>/list` | `{ page, size, items }` — ver tabla de catálogos abajo |
+| POST | `/ftd-spi-employee/rest/catalogs/validate-reentry` | `{ numIden, declaredReingreso, reingreso, corrected, value }` — único endpoint de catalogs que escribe |
 | GET | `/health` · `/health/ready` | públicos |
 
 ## Catálogos (`/catalogs/<clave>/list`)
@@ -47,8 +48,17 @@ Un solo paquete Oracle (`CATALOGS_PKG`, ver `db/pkg_management_catalogs_api.sql`
 | `banks` | Bancos (validación de banco) |
 | `account-types` | Tipos de cuenta para depósito |
 | `id-types` | Tipos de identificación |
+| `termination-reasons` | Causales de retiro/terminación |
+| `change-reasons` | Motivos de cambio/movimiento |
+| `pension-funds` | Fondos de pensión (AFP) — solo Colombia |
+| `health-providers` | Entidades promotoras de salud (EPS) — solo Colombia |
+| `compensation-funds` | Cajas de compensación — solo Colombia |
+| `severance-funds` | Fondos de cesantías — solo Colombia |
+| `contract-types` | Tipos de contrato de trabajo ("Contrato") |
 
-**Pendiente:** "Validar reingreso" (a partir de la cédula) no está incluido todavía — falta la consulta SQL. Se agrega en cuanto llegue.
+Filtros opcionales (`companyId`, `countryCode`, `stateCode`, `municipalityId`, `payrollTypeCode`, según el catálogo) van en el mismo body junto a `page`/`size` — ver `ListCatalogDto`. Antes de 2026-07-29 estos filtros estaban implementados en Oracle pero bloqueados por el DTO de Node (`property X should not exist`, 400) — ya está corregido.
+
+`POST /catalogs/validate-reentry` — `{ numIden, reingreso }` → `{ numIden, declaredReingreso, reingreso, corrected, value }`. Único endpoint de catalogs que escribe: si `reingreso` no coincide con lo que hay en `EO_PERSONA`/`TA_RELACION_LABORAL`, el PKG corrige `FTD_INGRESOS.REINGRESO`. Ver `PRC_VALIDATE_REENTRY` en `db/pkg_management_catalogs_api.sql`.
 
 **Cifrado P2C:** si el body trae `RequestJson` (CryptoJS.AES) → se desencripta → respuesta `{ ResponseJson }`. Por defecto, requests en claro siguen funcionando (compatibilidad). Con `REQUIRE_ENCRYPTED_PAYLOAD=true`, los endpoints de negocio (todo excepto `/health` y `/security/token`) rechazan con `400` cualquier request sin `RequestJson`. Errores: `{ statusCode, message, errors, timestamp, path }`.
 
@@ -112,4 +122,5 @@ Documentación vigente **v2.0** (Express + App Engine + 6 recursos). Los `v1.0` 
 - Setup GCP / runbook: [docs/deploy/gcp-setup.md](docs/deploy/gcp-setup.md) · PPAP: [docs/deploy/PPAP-ftd-spi-employee.md](docs/deploy/PPAP-ftd-spi-employee.md)
 - Postman Employee (P2C): [postman/ftd-spi-employee.postman_collection.json](postman/ftd-spi-employee.postman_collection.json)
 - Postman CRUD adicionales (P2C): [postman/ftd-spi-additional-crud.postman_collection.json](postman/ftd-spi-additional-crud.postman_collection.json)
-- Postman Catalogs (JSON plano): [postman/ftd-spi-catalogs.postman_collection.json](postman/ftd-spi-catalogs.postman_collection.json) — generada con `node scripts/build-catalogs-postman.js`
+- Postman Catalogs (P2C): [postman/ftd-spi-catalogs.postman_collection.json](postman/ftd-spi-catalogs.postman_collection.json) — generada con `node scripts/build-catalogs-postman.js` (18 catálogos + validate-reentry)
+- Postman Error Handling (P2C): [postman/ftd-spi-error-handling.postman_collection.json](postman/ftd-spi-error-handling.postman_collection.json) — generada con `node scripts/build-error-handling-postman.js`, enfocada en validar el manejo de errores en español (PKG_GLOBAL_ERRORS) por los caminos alcanzables vía HTTP

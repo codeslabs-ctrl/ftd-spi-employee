@@ -14,4 +14,10 @@ for (const def of CATALOG_DEFINITIONS) {
   router.post(`/${def.key}/list`, catalogsController.list(def.key));
 }
 
+// "Validar reingreso" — único endpoint de este módulo que no es una lista
+// de solo lectura. { numIden, reingreso } -> { numIden, declaredReingreso,
+// reingreso, corrected, value }. Ver PRC_VALIDATE_REENTRY en
+// db/pkg_management_catalogs_api.sql.
+router.post('/validate-reentry', catalogsController.validateReentry);
+
 export default router;

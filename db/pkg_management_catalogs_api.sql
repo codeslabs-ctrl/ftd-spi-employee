@@ -9,6 +9,27 @@
 -- timeout de conexión, conexión perdida) a un mensaje claro en español;
 -- cualquier otro error cae a un mensaje genérico en español con el detalle
 -- técnico acotado. Compilar PKG_GLOBAL_ERRORS antes que este paquete.
+--
+-- 13ª: PRC_VALIDATE_REENTRY ("Validar reingreso", 2026-07-28) — a partir de
+-- la cédula, valida si es reingreso y corrige INFOCENT.FTD_INGRESOS si no
+-- coincide con lo declarado (lógica de Jhon). Es el ÚNICO procedimiento de
+-- este paquete que escribe (UPDATE + COMMIT); los otros 12 siguen siendo de
+-- solo lectura. Ver comentario junto al body para el supuesto pendiente de
+-- confirmar sobre el esquema de FTD_INGRESOS.
+--
+-- 14ª-19ª (2026-07-29): INFOCENT.NMT035 (PRC_GET_TERMINATION_REASONS,
+-- causales de retiro) y NMT036 (PRC_GET_CHANGE_REASONS, motivos de cambio)
+-- confirmadas y agregadas como catálogos de solo lectura. Además, 4 tipos de
+-- institución NMT020 adicionales — solo Colombia, mismo patrón que
+-- PRC_GET_BANKS (TIPI_CODTIP='01') — quedaron confirmados: PRC_GET_PENSION_
+-- FUNDS (AFP, TIPI_CODTIP='PE'), PRC_GET_HEALTH_PROVIDERS (EPS, 'SA'),
+-- PRC_GET_COMPENSATION_FUNDS (Caja de Compensación, 'CA') y PRC_GET_
+-- SEVERANCE_FUNDS (Fondo de Cesantías, 'CE'). Los 4 reutilizan
+-- PRC_PARSE_BANKS_FILTER (genérico: companyId/page/size).
+--
+-- 20ª (2026-07-29): INFOCENT.EO_CONTRATO_TRABAJO ("Contrato",
+-- PRC_GET_CONTRACT_TYPES) confirmada y agregada — ya con permisos. Scoped
+-- por ID_EMPRESA (companyId OPCIONAL), reutiliza PRC_PARSE_BANKS_FILTER.
 --------------------------------------------------------------------------------
 
 CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_CATALOGS AS
@@ -72,6 +93,55 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_CATALOGS AS
                              O_JSON    OUT CLOB,
                              O_COD     OUT VARCHAR2,
                              O_MESSAGE OUT VARCHAR2);
+
+  -- 2026-07-29: NMT035/NMT036 confirmadas + 4 tipos de institución NMT020
+  -- adicionales (solo Colombia): AFP, EPS, Caja de Compensación, Fondo de
+  -- Cesantías. Mismo patrón que PRC_GET_BANKS (TIPI_CODTIP='01'), cada uno
+  -- con su propio valor de TIPI_CODTIP.
+  PROCEDURE PRC_GET_TERMINATION_REASONS(I_JSON    IN CLOB,
+                                        O_JSON    OUT CLOB,
+                                        O_COD     OUT VARCHAR2,
+                                        O_MESSAGE OUT VARCHAR2);
+
+  PROCEDURE PRC_GET_CHANGE_REASONS(I_JSON    IN CLOB,
+                                   O_JSON    OUT CLOB,
+                                   O_COD     OUT VARCHAR2,
+                                   O_MESSAGE OUT VARCHAR2);
+
+  PROCEDURE PRC_GET_PENSION_FUNDS(I_JSON    IN CLOB,
+                                  O_JSON    OUT CLOB,
+                                  O_COD     OUT VARCHAR2,
+                                  O_MESSAGE OUT VARCHAR2);
+
+  PROCEDURE PRC_GET_HEALTH_PROVIDERS(I_JSON    IN CLOB,
+                                     O_JSON    OUT CLOB,
+                                     O_COD     OUT VARCHAR2,
+                                     O_MESSAGE OUT VARCHAR2);
+
+  PROCEDURE PRC_GET_COMPENSATION_FUNDS(I_JSON    IN CLOB,
+                                       O_JSON    OUT CLOB,
+                                       O_COD     OUT VARCHAR2,
+                                       O_MESSAGE OUT VARCHAR2);
+
+  PROCEDURE PRC_GET_SEVERANCE_FUNDS(I_JSON    IN CLOB,
+                                    O_JSON    OUT CLOB,
+                                    O_COD     OUT VARCHAR2,
+                                    O_MESSAGE OUT VARCHAR2);
+
+  -- 2026-07-29: INFOCENT.EO_CONTRATO_TRABAJO confirmada (ya con permisos).
+  PROCEDURE PRC_GET_CONTRACT_TYPES(I_JSON    IN CLOB,
+                                   O_JSON    OUT CLOB,
+                                   O_COD     OUT VARCHAR2,
+                                   O_MESSAGE OUT VARCHAR2);
+
+  -- ÚNICO procedimiento de este paquete que NO es de solo lectura: valida
+  -- si una cédula es reingreso y corrige INFOCENT.FTD_INGRESOS si el valor
+  -- declarado por el caller no coincide con lo que hay en EO_PERSONA/
+  -- TA_RELACION_LABORAL (lógica de Jhon, ver comentario en el body).
+  PROCEDURE PRC_VALIDATE_REENTRY(I_JSON    IN CLOB,
+                                 O_JSON    OUT CLOB,
+                                 O_COD     OUT VARCHAR2,
+                                 O_MESSAGE OUT VARCHAR2);
 
 END PKG_MANAGEMENT_CATALOGS;
 /
@@ -1345,6 +1415,728 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
       O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT020');
   END PRC_GET_BANKS;
+
+  /*=========================================================================
+   TERMINATION REASONS — INFOCENT.NMT035 (confirmada, 2026-07-29).
+   Causales de retiro/terminación de contrato (ej. "TERMINACION POR
+   ABANDONO DE CARGO", "RENUNCIA POR PARTE DEL TRABAJADOR"). Columnas:
+   CODDES, DESDE1, DESDE2, IMPLIQ, CLASSO + auditoría. IMPLIQ y CLASSO se
+   exponen literales (sin traducir) — significado de negocio no confirmado.
+   Tabla plana, sin filtros.
+  ==========================================================================*/
+  PROCEDURE PRC_GET_TERMINATION_REASONS(I_JSON    IN CLOB,
+                                        O_JSON    OUT CLOB,
+                                        O_COD     OUT VARCHAR2,
+                                        O_MESSAGE OUT VARCHAR2) IS
+    V_PAGE  NUMBER;
+    V_SIZE  NUMBER;
+    V_ARRAY CLOB;
+    V_ROW   VARCHAR2(4000);
+    V_COUNT PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_PAGE(I_JSON, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT N.CODDES, N.DESDE1, N.DESDE2, N.IMPLIQ, N.CLASSO,
+                     N.USRCRE, N.FECCRE, N.USRACT, N.FECACT
+                FROM INFOCENT.NMT035 N
+               ORDER BY N.CODDES
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('code', R.CODDES) || ','
+               || FN_JSON_PAIR_CC('description', R.DESDE1) || ','
+               || FN_JSON_PAIR_CC('description2', R.DESDE2) || ','
+               || FN_JSON_PAIR_CC('impliqFlag', R.IMPLIQ) || ','
+               || FN_JSON_PAIR_CC('classCode', R.CLASSO) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD'))
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"terminationReasons":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT035');
+  END PRC_GET_TERMINATION_REASONS;
+
+  /*=========================================================================
+   CHANGE REASONS — INFOCENT.NMT036 (confirmada, 2026-07-29).
+   Motivos de cambio/movimiento (ej. "PROMOCION", "DECRETO PRESIDENCIAL",
+   "CONTRATO", "INGRESO", "MERITO"). Columnas: CODCAM, DESCAM + auditoría.
+   Tabla plana, sin filtros.
+  ==========================================================================*/
+  PROCEDURE PRC_GET_CHANGE_REASONS(I_JSON    IN CLOB,
+                                   O_JSON    OUT CLOB,
+                                   O_COD     OUT VARCHAR2,
+                                   O_MESSAGE OUT VARCHAR2) IS
+    V_PAGE  NUMBER;
+    V_SIZE  NUMBER;
+    V_ARRAY CLOB;
+    V_ROW   VARCHAR2(4000);
+    V_COUNT PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_PAGE(I_JSON, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT N.CODCAM, N.DESCAM, N.USRCRE, N.FECCRE, N.USRACT, N.FECACT
+                FROM INFOCENT.NMT036 N
+               ORDER BY N.CODCAM
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('code', R.CODCAM) || ','
+               || FN_JSON_PAIR_CC('description', R.DESCAM) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD'))
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"changeReasons":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT036');
+  END PRC_GET_CHANGE_REASONS;
+
+  /*=========================================================================
+   PENSION FUNDS (AFP) — INFOCENT.NMT020, TIPI_CODTIP = 'PE' (confirmado,
+   2026-07-29, solo Colombia). Mismas columnas/JSON que PRC_GET_BANKS;
+   reutiliza PRC_PARSE_BANKS_FILTER (genérico: companyId/page/size, nada
+   específico de bancos pese al nombre).
+  ==========================================================================*/
+  PROCEDURE PRC_GET_PENSION_FUNDS(I_JSON    IN CLOB,
+                                  O_JSON    OUT CLOB,
+                                  O_COD     OUT VARCHAR2,
+                                  O_MESSAGE OUT VARCHAR2) IS
+    C_TYPE_CODE  CONSTANT VARCHAR2(2) := 'PE';
+    V_COMPANY_ID VARCHAR2(4);
+    V_PAGE       NUMBER;
+    V_SIZE       NUMBER;
+    V_ARRAY      CLOB;
+    V_ROW        VARCHAR2(32767);
+    V_COUNT      PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_BANKS_FILTER(I_JSON, V_COMPANY_ID, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT K.CIA_CODCIA, K.TIPI_CODTIP, K.CODINS, K.DESINS,
+                     K.NRORIF, K.DIREC1, K.DIREC2, K.DIREC3,
+                     K.CDAD_CODCIU, K.EDO_CODEDO, K.PAI_CODPAI,
+                     K.NROTL1, K.NROTL2, K.NROFAX, K.NROCTA, K.CTACON,
+                     K.NOMCON, K.TCTA_TIPCTA, K.NOCTTO,
+                     K.USRCRE, K.FECCRE, K.USRACT, K.FECACT, K.CODRIE
+                FROM INFOCENT.NMT020 K
+               WHERE K.TIPI_CODTIP = C_TYPE_CODE
+                 AND (V_COMPANY_ID IS NULL OR K.CIA_CODCIA = V_COMPANY_ID)
+               ORDER BY K.DESINS
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.CIA_CODCIA) || ','
+               || FN_JSON_PAIR_CC('institutionTypeCode', R.TIPI_CODTIP) || ','
+               || FN_JSON_PAIR_CC('code', R.CODINS) || ','
+               || FN_JSON_PAIR_CC('name', R.DESINS) || ','
+               || FN_JSON_PAIR_CC('taxId', R.NRORIF) || ','
+               || FN_JSON_PAIR_CC('address1', R.DIREC1) || ','
+               || FN_JSON_PAIR_CC('address2', R.DIREC2) || ','
+               || FN_JSON_PAIR_CC('address3', R.DIREC3) || ','
+               || FN_JSON_PAIR_CC('cityCode', R.CDAD_CODCIU) || ','
+               || FN_JSON_PAIR_CC('stateCode', R.EDO_CODEDO) || ','
+               || FN_JSON_PAIR_CC('countryCode', R.PAI_CODPAI) || ','
+               || FN_JSON_PAIR_CC('phone1', R.NROTL1) || ','
+               || FN_JSON_PAIR_CC('phone2', R.NROTL2) || ','
+               || FN_JSON_PAIR_CC('fax', R.NROFAX) || ','
+               || FN_JSON_PAIR_CC('accountNumber', R.NROCTA) || ','
+               || FN_JSON_PAIR_CC('accountControl', R.CTACON) || ','
+               || FN_JSON_PAIR_CC('accountHolderName', R.NOMCON) || ','
+               || FN_JSON_PAIR_CC('accountTypeCode', R.TCTA_TIPCTA) || ','
+               || FN_JSON_PAIR_CC('contractNumber', R.NOCTTO) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('riskCode', R.CODRIE)
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"pensionFunds":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT020');
+  END PRC_GET_PENSION_FUNDS;
+
+  /*=========================================================================
+   HEALTH PROVIDERS (EPS) — INFOCENT.NMT020, TIPI_CODTIP = 'SA' (confirmado,
+   2026-07-29, solo Colombia). Mismo patrón que PRC_GET_PENSION_FUNDS.
+  ==========================================================================*/
+  PROCEDURE PRC_GET_HEALTH_PROVIDERS(I_JSON    IN CLOB,
+                                     O_JSON    OUT CLOB,
+                                     O_COD     OUT VARCHAR2,
+                                     O_MESSAGE OUT VARCHAR2) IS
+    C_TYPE_CODE  CONSTANT VARCHAR2(2) := 'SA';
+    V_COMPANY_ID VARCHAR2(4);
+    V_PAGE       NUMBER;
+    V_SIZE       NUMBER;
+    V_ARRAY      CLOB;
+    V_ROW        VARCHAR2(32767);
+    V_COUNT      PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_BANKS_FILTER(I_JSON, V_COMPANY_ID, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT K.CIA_CODCIA, K.TIPI_CODTIP, K.CODINS, K.DESINS,
+                     K.NRORIF, K.DIREC1, K.DIREC2, K.DIREC3,
+                     K.CDAD_CODCIU, K.EDO_CODEDO, K.PAI_CODPAI,
+                     K.NROTL1, K.NROTL2, K.NROFAX, K.NROCTA, K.CTACON,
+                     K.NOMCON, K.TCTA_TIPCTA, K.NOCTTO,
+                     K.USRCRE, K.FECCRE, K.USRACT, K.FECACT, K.CODRIE
+                FROM INFOCENT.NMT020 K
+               WHERE K.TIPI_CODTIP = C_TYPE_CODE
+                 AND (V_COMPANY_ID IS NULL OR K.CIA_CODCIA = V_COMPANY_ID)
+               ORDER BY K.DESINS
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.CIA_CODCIA) || ','
+               || FN_JSON_PAIR_CC('institutionTypeCode', R.TIPI_CODTIP) || ','
+               || FN_JSON_PAIR_CC('code', R.CODINS) || ','
+               || FN_JSON_PAIR_CC('name', R.DESINS) || ','
+               || FN_JSON_PAIR_CC('taxId', R.NRORIF) || ','
+               || FN_JSON_PAIR_CC('address1', R.DIREC1) || ','
+               || FN_JSON_PAIR_CC('address2', R.DIREC2) || ','
+               || FN_JSON_PAIR_CC('address3', R.DIREC3) || ','
+               || FN_JSON_PAIR_CC('cityCode', R.CDAD_CODCIU) || ','
+               || FN_JSON_PAIR_CC('stateCode', R.EDO_CODEDO) || ','
+               || FN_JSON_PAIR_CC('countryCode', R.PAI_CODPAI) || ','
+               || FN_JSON_PAIR_CC('phone1', R.NROTL1) || ','
+               || FN_JSON_PAIR_CC('phone2', R.NROTL2) || ','
+               || FN_JSON_PAIR_CC('fax', R.NROFAX) || ','
+               || FN_JSON_PAIR_CC('accountNumber', R.NROCTA) || ','
+               || FN_JSON_PAIR_CC('accountControl', R.CTACON) || ','
+               || FN_JSON_PAIR_CC('accountHolderName', R.NOMCON) || ','
+               || FN_JSON_PAIR_CC('accountTypeCode', R.TCTA_TIPCTA) || ','
+               || FN_JSON_PAIR_CC('contractNumber', R.NOCTTO) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('riskCode', R.CODRIE)
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"healthProviders":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT020');
+  END PRC_GET_HEALTH_PROVIDERS;
+
+  /*=========================================================================
+   COMPENSATION FUNDS (Caja de Compensación) — INFOCENT.NMT020,
+   TIPI_CODTIP = 'CA' (confirmado, 2026-07-29, solo Colombia). Mismo patrón
+   que PRC_GET_PENSION_FUNDS.
+  ==========================================================================*/
+  PROCEDURE PRC_GET_COMPENSATION_FUNDS(I_JSON    IN CLOB,
+                                       O_JSON    OUT CLOB,
+                                       O_COD     OUT VARCHAR2,
+                                       O_MESSAGE OUT VARCHAR2) IS
+    C_TYPE_CODE  CONSTANT VARCHAR2(2) := 'CA';
+    V_COMPANY_ID VARCHAR2(4);
+    V_PAGE       NUMBER;
+    V_SIZE       NUMBER;
+    V_ARRAY      CLOB;
+    V_ROW        VARCHAR2(32767);
+    V_COUNT      PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_BANKS_FILTER(I_JSON, V_COMPANY_ID, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT K.CIA_CODCIA, K.TIPI_CODTIP, K.CODINS, K.DESINS,
+                     K.NRORIF, K.DIREC1, K.DIREC2, K.DIREC3,
+                     K.CDAD_CODCIU, K.EDO_CODEDO, K.PAI_CODPAI,
+                     K.NROTL1, K.NROTL2, K.NROFAX, K.NROCTA, K.CTACON,
+                     K.NOMCON, K.TCTA_TIPCTA, K.NOCTTO,
+                     K.USRCRE, K.FECCRE, K.USRACT, K.FECACT, K.CODRIE
+                FROM INFOCENT.NMT020 K
+               WHERE K.TIPI_CODTIP = C_TYPE_CODE
+                 AND (V_COMPANY_ID IS NULL OR K.CIA_CODCIA = V_COMPANY_ID)
+               ORDER BY K.DESINS
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.CIA_CODCIA) || ','
+               || FN_JSON_PAIR_CC('institutionTypeCode', R.TIPI_CODTIP) || ','
+               || FN_JSON_PAIR_CC('code', R.CODINS) || ','
+               || FN_JSON_PAIR_CC('name', R.DESINS) || ','
+               || FN_JSON_PAIR_CC('taxId', R.NRORIF) || ','
+               || FN_JSON_PAIR_CC('address1', R.DIREC1) || ','
+               || FN_JSON_PAIR_CC('address2', R.DIREC2) || ','
+               || FN_JSON_PAIR_CC('address3', R.DIREC3) || ','
+               || FN_JSON_PAIR_CC('cityCode', R.CDAD_CODCIU) || ','
+               || FN_JSON_PAIR_CC('stateCode', R.EDO_CODEDO) || ','
+               || FN_JSON_PAIR_CC('countryCode', R.PAI_CODPAI) || ','
+               || FN_JSON_PAIR_CC('phone1', R.NROTL1) || ','
+               || FN_JSON_PAIR_CC('phone2', R.NROTL2) || ','
+               || FN_JSON_PAIR_CC('fax', R.NROFAX) || ','
+               || FN_JSON_PAIR_CC('accountNumber', R.NROCTA) || ','
+               || FN_JSON_PAIR_CC('accountControl', R.CTACON) || ','
+               || FN_JSON_PAIR_CC('accountHolderName', R.NOMCON) || ','
+               || FN_JSON_PAIR_CC('accountTypeCode', R.TCTA_TIPCTA) || ','
+               || FN_JSON_PAIR_CC('contractNumber', R.NOCTTO) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('riskCode', R.CODRIE)
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"compensationFunds":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT020');
+  END PRC_GET_COMPENSATION_FUNDS;
+
+  /*=========================================================================
+   SEVERANCE FUNDS (Fondo de Cesantías) — INFOCENT.NMT020,
+   TIPI_CODTIP = 'CE' (confirmado, 2026-07-29, solo Colombia). Mismo patrón
+   que PRC_GET_PENSION_FUNDS.
+  ==========================================================================*/
+  PROCEDURE PRC_GET_SEVERANCE_FUNDS(I_JSON    IN CLOB,
+                                    O_JSON    OUT CLOB,
+                                    O_COD     OUT VARCHAR2,
+                                    O_MESSAGE OUT VARCHAR2) IS
+    C_TYPE_CODE  CONSTANT VARCHAR2(2) := 'CE';
+    V_COMPANY_ID VARCHAR2(4);
+    V_PAGE       NUMBER;
+    V_SIZE       NUMBER;
+    V_ARRAY      CLOB;
+    V_ROW        VARCHAR2(32767);
+    V_COUNT      PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_BANKS_FILTER(I_JSON, V_COMPANY_ID, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT K.CIA_CODCIA, K.TIPI_CODTIP, K.CODINS, K.DESINS,
+                     K.NRORIF, K.DIREC1, K.DIREC2, K.DIREC3,
+                     K.CDAD_CODCIU, K.EDO_CODEDO, K.PAI_CODPAI,
+                     K.NROTL1, K.NROTL2, K.NROFAX, K.NROCTA, K.CTACON,
+                     K.NOMCON, K.TCTA_TIPCTA, K.NOCTTO,
+                     K.USRCRE, K.FECCRE, K.USRACT, K.FECACT, K.CODRIE
+                FROM INFOCENT.NMT020 K
+               WHERE K.TIPI_CODTIP = C_TYPE_CODE
+                 AND (V_COMPANY_ID IS NULL OR K.CIA_CODCIA = V_COMPANY_ID)
+               ORDER BY K.DESINS
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.CIA_CODCIA) || ','
+               || FN_JSON_PAIR_CC('institutionTypeCode', R.TIPI_CODTIP) || ','
+               || FN_JSON_PAIR_CC('code', R.CODINS) || ','
+               || FN_JSON_PAIR_CC('name', R.DESINS) || ','
+               || FN_JSON_PAIR_CC('taxId', R.NRORIF) || ','
+               || FN_JSON_PAIR_CC('address1', R.DIREC1) || ','
+               || FN_JSON_PAIR_CC('address2', R.DIREC2) || ','
+               || FN_JSON_PAIR_CC('address3', R.DIREC3) || ','
+               || FN_JSON_PAIR_CC('cityCode', R.CDAD_CODCIU) || ','
+               || FN_JSON_PAIR_CC('stateCode', R.EDO_CODEDO) || ','
+               || FN_JSON_PAIR_CC('countryCode', R.PAI_CODPAI) || ','
+               || FN_JSON_PAIR_CC('phone1', R.NROTL1) || ','
+               || FN_JSON_PAIR_CC('phone2', R.NROTL2) || ','
+               || FN_JSON_PAIR_CC('fax', R.NROFAX) || ','
+               || FN_JSON_PAIR_CC('accountNumber', R.NROCTA) || ','
+               || FN_JSON_PAIR_CC('accountControl', R.CTACON) || ','
+               || FN_JSON_PAIR_CC('accountHolderName', R.NOMCON) || ','
+               || FN_JSON_PAIR_CC('accountTypeCode', R.TCTA_TIPCTA) || ','
+               || FN_JSON_PAIR_CC('contractNumber', R.NOCTTO) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('riskCode', R.CODRIE)
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"severanceFunds":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT020');
+  END PRC_GET_SEVERANCE_FUNDS;
+
+  /*=========================================================================
+   CONTRACT TYPES — INFOCENT.EO_CONTRATO_TRABAJO (confirmada, 2026-07-29).
+   "Contrato": tipos de contrato de trabajo. Columnas: ID_EMPRESA, ID,
+   NOMBRE, ID_TIPO_CONTRATO, NUM_TOPE, DURACION_MAX, LAPSO_ESPERA,
+   DURACION_MAX_ACUM, OBSERVACIONES + auditoría. Scoped por ID_EMPRESA
+   (companyId OPCIONAL, reutiliza PRC_PARSE_BANKS_FILTER — genérico:
+   companyId/page/size). NUM_TOPE/DURACION_MAX/LAPSO_ESPERA/
+   DURACION_MAX_ACUM se exponen literales — significado de negocio exacto
+   (unidades: días/meses, etc.) no confirmado.
+  ==========================================================================*/
+  PROCEDURE PRC_GET_CONTRACT_TYPES(I_JSON    IN CLOB,
+                                   O_JSON    OUT CLOB,
+                                   O_COD     OUT VARCHAR2,
+                                   O_MESSAGE OUT VARCHAR2) IS
+    V_COMPANY_ID VARCHAR2(4);
+    V_PAGE       NUMBER;
+    V_SIZE       NUMBER;
+    V_ARRAY      CLOB;
+    V_ROW        VARCHAR2(4000);
+    V_COUNT      PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_BANKS_FILTER(I_JSON, V_COMPANY_ID, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT T.ID_EMPRESA, T.ID, T.NOMBRE, T.ID_TIPO_CONTRATO,
+                     T.NUM_TOPE, T.DURACION_MAX, T.LAPSO_ESPERA,
+                     T.DURACION_MAX_ACUM, T.OBSERVACIONES,
+                     T.USRCRE, T.FECCRE, T.USRACT, T.FECACT
+                FROM INFOCENT.EO_CONTRATO_TRABAJO T
+               WHERE (V_COMPANY_ID IS NULL OR T.ID_EMPRESA = V_COMPANY_ID)
+               ORDER BY T.ID_EMPRESA, T.ID
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.ID_EMPRESA) || ','
+               || FN_JSON_PAIR_CC('code', R.ID) || ','
+               || FN_JSON_PAIR_CC('name', R.NOMBRE) || ','
+               || FN_JSON_PAIR_CC('contractTypeCode', R.ID_TIPO_CONTRATO) || ','
+               || FN_JSON_PAIR_CC('maxCount', TO_CHAR(R.NUM_TOPE)) || ','
+               || FN_JSON_PAIR_CC('maxDuration', TO_CHAR(R.DURACION_MAX)) || ','
+               || FN_JSON_PAIR_CC('waitingPeriod', TO_CHAR(R.LAPSO_ESPERA)) || ','
+               || FN_JSON_PAIR_CC('maxAccumulatedDuration', TO_CHAR(R.DURACION_MAX_ACUM)) || ','
+               || FN_JSON_PAIR_CC('observations', R.OBSERVACIONES) || ','
+               || FN_JSON_PAIR_CC('createdBy', R.USRCRE) || ','
+               || FN_JSON_PAIR_CC('createdAt', TO_CHAR(R.FECCRE, 'YYYY-MM-DD')) || ','
+               || FN_JSON_PAIR_CC('updatedBy', R.USRACT) || ','
+               || FN_JSON_PAIR_CC('updatedAt', TO_CHAR(R.FECACT, 'YYYY-MM-DD'))
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"contractTypes":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.EO_CONTRATO_TRABAJO');
+  END PRC_GET_CONTRACT_TYPES;
+
+  /*=========================================================================
+   VALIDAR REINGRESO — a partir de la cédula (numIden), identifica si es o
+   no un reingreso y corrige INFOCENT.FTD_INGRESOS si lo que declaró el
+   caller (reingreso: 'SI'/'NO') no coincide con lo que existe en
+   EO_PERSONA/TA_RELACION_LABORAL. Lógica tal como la dio Jhon — único
+   procedimiento de este paquete que escribe (UPDATE + COMMIT); los otros 12
+   son de solo lectura.
+
+   SUPUESTO PENDIENTE DE CONFIRMAR: se asume INFOCENT.FTD_INGRESOS (mismo
+   esquema que el resto de tablas de este paquete) con columnas
+   NUMERO_DOCUMENTO y REINGRESO — Jhon las pasó sin calificar esquema.
+   Ajustar el nombre de tabla si en realidad vive en otro esquema.
+
+   Contrato de entrada: { "numIden": "<cédula>", "reingreso": "SI"|"NO" }
+   (el "reingreso" que el caller cree que es, ANTES de validar).
+
+   Salida: { "reentry": {
+     "numIden", "declaredReingreso" (lo que mandó el caller),
+     "reingreso" (el valor correcto/final tras la validación),
+     "corrected" ("S" si se tuvo que corregir FTD_INGRESOS, "N" si no),
+     "value" (0/1, el mismo l_value que devolvía la función original de
+       Jhon: 0 = se corrigió un mismatch, 1 = ya estaba correcto)
+   } }
+  ==========================================================================*/
+  PROCEDURE PRC_VALIDATE_REENTRY(I_JSON    IN CLOB,
+                                 O_JSON    OUT CLOB,
+                                 O_COD     OUT VARCHAR2,
+                                 O_MESSAGE OUT VARCHAR2) IS
+    V_NUM_IDEN  VARCHAR2(20);
+    V_DECLARED  VARCHAR2(2);
+    V_EXISTE    PLS_INTEGER;
+    V_FINAL     VARCHAR2(2);
+    V_CORRECTED VARCHAR2(1) := 'N';
+    V_VALUE     PLS_INTEGER;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    BEGIN
+      SELECT NUM_IDEN, REINGRESO
+        INTO V_NUM_IDEN, V_DECLARED
+        FROM JSON_TABLE(I_JSON, '$'
+             COLUMNS(NUM_IDEN VARCHAR2(20) PATH '$.numIden',
+                     REINGRESO VARCHAR2(2) PATH '$.reingreso'));
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        V_NUM_IDEN := NULL;
+        V_DECLARED := NULL;
+    END;
+
+    IF V_NUM_IDEN IS NULL OR V_DECLARED IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20002, 'numIden y reingreso son obligatorios');
+    END IF;
+
+    -- Mismo criterio de Jhon: prioriza una relación laboral ACTIVA
+    -- (F_RETIRO IS NULL) sobre una ya retirada; el LEFT JOIN garantiza una
+    -- fila aunque la persona no tenga ninguna relación laboral todavía.
+    SELECT COUNT(*) INTO V_EXISTE
+      FROM (
+        SELECT A.ID AS ID_PERSONA
+          FROM INFOCENT.EO_PERSONA A
+          LEFT JOIN INFOCENT.TA_RELACION_LABORAL B ON A.ID = B.ID_PERSONA
+         WHERE A.NUM_IDEN = V_NUM_IDEN
+         ORDER BY (CASE WHEN B.F_RETIRO IS NULL THEN 0 ELSE 1 END) ASC, A.ID DESC
+      )
+     WHERE ROWNUM = 1;
+
+    IF V_DECLARED = 'SI' AND V_EXISTE = 0 THEN
+      -- El caller dijo que era reingreso, pero no hay rastro previo: corrige.
+      UPDATE INFOCENT.FTD_INGRESOS
+         SET REINGRESO = 'NO'
+       WHERE NUMERO_DOCUMENTO = V_NUM_IDEN;
+      COMMIT;
+      V_VALUE     := 0;
+      V_FINAL     := 'NO';
+      V_CORRECTED := 'S';
+    ELSIF V_DECLARED = 'NO' AND V_EXISTE > 0 THEN
+      -- El caller dijo que NO era reingreso, pero sí existe rastro previo: corrige.
+      UPDATE INFOCENT.FTD_INGRESOS
+         SET REINGRESO = 'SI'
+       WHERE NUMERO_DOCUMENTO = V_NUM_IDEN;
+      COMMIT;
+      V_VALUE     := 0;
+      V_FINAL     := 'SI';
+      V_CORRECTED := 'S';
+    ELSE
+      -- Ya coincidía con lo declarado por el caller, no hace falta corregir.
+      V_VALUE := 1;
+      V_FINAL := V_DECLARED;
+    END IF;
+
+    O_JSON := '{"reentry":{'
+           || FN_JSON_PAIR_CC('numIden', V_NUM_IDEN) || ','
+           || FN_JSON_PAIR_CC('declaredReingreso', V_DECLARED) || ','
+           || FN_JSON_PAIR_CC('reingreso', V_FINAL) || ','
+           || FN_JSON_PAIR_CC('corrected', V_CORRECTED) || ','
+           || '"value":' || TO_CHAR(V_VALUE)
+           || '}}';
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.FTD_INGRESOS');
+  END PRC_VALIDATE_REENTRY;
 
 END PKG_MANAGEMENT_CATALOGS;
 /

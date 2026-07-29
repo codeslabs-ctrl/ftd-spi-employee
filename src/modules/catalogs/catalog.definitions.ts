@@ -7,15 +7,36 @@
  * solo para logs/documentación y sí va en español.
  *
  * Todos comparten el mismo paquete Oracle (CATALOGS_PKG, por defecto
- * pkg_management_catalogs) — cada `procedure` es un wrapper de
- * PRC_GET_GENERIC_CATALOG dentro de ese paquete (ver
- * db/pkg_management_catalogs_api.sql). Agregar un catálogo nuevo = 1 entrada
- * aquí + su wrapper en el paquete Oracle + su seed en
+ * pkg_management_catalogs) — cada `procedure` es un SELECT estático propio
+ * dentro de ese paquete (ver db/pkg_management_catalogs_api.sql; el motor
+ * genérico PRC_GET_GENERIC_CATALOG ya no existe, se eliminó al migrar los
+ * 12 catálogos originales). Agregar un catálogo nuevo = 1 entrada aquí + su
+ * PRC_GET_* en el paquete Oracle + su seed en
  * in-memory-catalogs.repository.ts (para pruebas con FAKE_DB).
  *
- * Pendiente (no incluido todavía): "Validar reingreso" — falta la consulta
- * SQL (Jhon). Se agrega como una entrada más en cuanto llegue.
+ * 19 catálogos en este arreglo: los 12 originales + 7 agregados 2026-07-29
+ * (termination-reasons, change-reasons, pension-funds, health-providers,
+ * compensation-funds, severance-funds — estos 4 solo Colombia — y
+ * contract-types, EO_CONTRATO_TRABAJO).
+ *
+ * "Validar reingreso" (a partir de la cédula) NO está en este arreglo: a
+ * diferencia de los 18, no es una lista paginada — es un solo endpoint
+ * dedicado, POST /catalogs/validate-reentry (ver PRC_VALIDATE_REENTRY en
+ * db/pkg_management_catalogs_api.sql y catalogs.route.ts).
  */
+/**
+ * Filtros opcionales compartidos entre los 18 catálogos de "list" — no
+ * todos los catálogos usan todos estos campos, cada PRC_PARSE_*_FILTER en
+ * Oracle solo lee las rutas JSON que le interesan e ignora el resto.
+ */
+export interface CatalogFilters {
+  companyId?: string;
+  countryCode?: string;
+  stateCode?: string;
+  municipalityId?: string;
+  payrollTypeCode?: string;
+}
+
 export interface CatalogDefinition {
   /** Segmento de ruta: /catalogs/<key>/list */
   key: string;
@@ -99,6 +120,48 @@ export const CATALOG_DEFINITIONS: CatalogDefinition[] = [
     procedure: 'prc_get_id_types',
     jsonKey: 'idTypes',
     label: 'Tipos de identificación',
+  },
+  {
+    key: 'termination-reasons',
+    procedure: 'prc_get_termination_reasons',
+    jsonKey: 'terminationReasons',
+    label: 'Causales de retiro/terminación',
+  },
+  {
+    key: 'change-reasons',
+    procedure: 'prc_get_change_reasons',
+    jsonKey: 'changeReasons',
+    label: 'Motivos de cambio/movimiento',
+  },
+  {
+    key: 'pension-funds',
+    procedure: 'prc_get_pension_funds',
+    jsonKey: 'pensionFunds',
+    label: 'Fondos de pensión (AFP) — solo Colombia',
+  },
+  {
+    key: 'health-providers',
+    procedure: 'prc_get_health_providers',
+    jsonKey: 'healthProviders',
+    label: 'Entidades promotoras de salud (EPS) — solo Colombia',
+  },
+  {
+    key: 'compensation-funds',
+    procedure: 'prc_get_compensation_funds',
+    jsonKey: 'compensationFunds',
+    label: 'Cajas de compensación — solo Colombia',
+  },
+  {
+    key: 'severance-funds',
+    procedure: 'prc_get_severance_funds',
+    jsonKey: 'severanceFunds',
+    label: 'Fondos de cesantías — solo Colombia',
+  },
+  {
+    key: 'contract-types',
+    procedure: 'prc_get_contract_types',
+    jsonKey: 'contractTypes',
+    label: 'Tipos de contrato de trabajo ("Contrato")',
   },
 ];
 

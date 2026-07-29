@@ -22,13 +22,13 @@ Todos los `PKG_MANAGEMENT_*` la llaman calificada (`PKG_GLOBAL_ERRORS.FN_GET_ERR
 | marital-status | `pkg_management_marital_status` | `INFOCENT.EO_ESTADO_CIVIL` | OK |
 | org-unit | `pkg_management_org_unit` | `INFOCENT.EO_UNIDAD` | OK |
 | job-post | `pkg_management_job_post` | `INFOCENT.EO_PUESTO` | OK (confirmada, columnas verificadas) |
-| catalogs (12 catálogos) | `pkg_management_catalogs` | ver detalle abajo | 12/12 confirmadas y migradas a SELECT estático (verificadas contra QA Colombia real); `cities` sin filtro de dominio (ver nota) |
+| catalogs (19 catálogos + validar reingreso) | `pkg_management_catalogs` | ver detalle abajo | 19/19 catálogos de solo lectura confirmados y migrados a SELECT estático (12 verificados contra QA Colombia real + 7 agregados 2026-07-29 con DESCRIBE/SELECT confirmados, probados con FAKE_DB, aún sin evidencia Postman contra QA real); `cities` sin filtro de dominio (ver nota). Más `PRC_VALIDATE_REENTRY` (escribe) — wireing Node completo, probado con FAKE_DB, pendiente confirmar esquema de `FTD_INGRESOS` y compilar/probar contra QA real. |
 
 Nota histórica: en la verificación inicial (2026-07-16) `INFOCENT.EO_PUESTO` no aparecía en QA VE y solo se encontraba `INFOCENT.TA_RELACION_PUESTO` (relación laboral). Ya se confirmó que la tabla existe con las columnas esperadas (`ID_EMPRESA, ID_UNIDAD, ID, NOMBRE, ID_CARGO, DESCRIP, FUNCION, FECHA_INI, FECHA_FIN, RIESGO`), así que el paquete se reescribió con `SELECT` estático (mismo estilo que `position`) en vez del SQL dinámico que se usaba como salvaguarda.
 
-## `pkg_management_catalogs_api.sql` — un solo paquete para 12 catálogos
+## `pkg_management_catalogs_api.sql` — un solo paquete para 19 catálogos + validar reingreso
 
-Un único paquete Oracle (`PKG_MANAGEMENT_CATALOGS`) agrupa el GET de todos los catálogos de solo lectura pedidos: municipios, países, parroquias, localidades, ciudades, entidades federales, tipos de nómina, grupos, sucursales, bancos, tipos de cuenta y tipos de identificación.
+Un único paquete Oracle (`PKG_MANAGEMENT_CATALOGS`) agrupa el GET de todos los catálogos de solo lectura pedidos: municipios, países, parroquias, localidades, ciudades, entidades federales, tipos de nómina, grupos, sucursales, bancos, tipos de cuenta, tipos de identificación, causales de retiro, motivos de cambio, tipos de contrato de trabajo, y (solo Colombia) fondos de pensión/AFP, EPS, cajas de compensación y fondos de cesantías. Más `PRC_VALIDATE_REENTRY` ("Validar reingreso"), el único que escribe.
 
 Convención de nombres: procedimientos/funciones del paquete en inglés (`PRC_GET_COUNTRIES`, `PRC_GET_BANKS`...), igual que el resto de paquetes (`PRC_GET_EMPLOYEE`, `PRC_MERGE_POSITION`...). Los mensajes de error sí van en español (contenido, no identificador).
 
@@ -50,11 +50,25 @@ Convención de nombres: procedimientos/funciones del paquete en inglés (`PRC_GE
 - `INFOCENT.NMT022` (→ `account-types`): `TIPCTA`, `DESCTA` (`NOT NULL`). Solo 2 filas en QA: `1`=CUENTA CORRIENTE, `2`=CUENTA AHORRO. Sin filtros. ✅ Verificado.
 - `INFOCENT.EO_TIPO_IDENTIFICACION` (→ `id-types`): `ID`, `DESCRIP` (`NOT NULL`). Tabla plana, sin filtros (algunas entradas legacy redundantes, ej. `4`/`CC` ambos "cédula de ciudadanía"). ✅ Verificado.
 
-**Pendiente:**
-- **"Validar reingreso"** (a partir de la cédula) **no está incluido** — falta la consulta SQL (pendiente de Jhon). Se agrega como catálogo 13 en cuanto llegue.
-- Confirmar el `DOMAIN` correcto de `cities` (`SPI_REF`) — pendiente de conversación del usuario con la persona que dio la información original.
+**13ª — `PRC_VALIDATE_REENTRY` ("Validar reingreso", 2026-07-28):** a diferencia de los otros 17 (solo lectura), este SÍ escribe. Input: `{ "numIden": "<cédula>", "reingreso": "SI"|"NO" }` (lo que el caller declara). Busca en `INFOCENT.EO_PERSONA` + `INFOCENT.TA_RELACION_LABORAL` (prioriza relación laboral activa, `F_RETIRO IS NULL`, sobre una ya retirada) para determinar si la cédula tiene rastro previo; si lo declarado por el caller no coincide con lo encontrado, corrige `INFOCENT.FTD_INGRESOS.REINGRESO` (`UPDATE` + `COMMIT`) — misma lógica que pasó Jhon, adaptada al contrato `I_JSON`/`O_JSON`/`O_COD`/`O_MESSAGE`. Salida: `{ "reentry": { "numIden", "declaredReingreso", "reingreso" (valor final/corregido), "corrected" ("S"/"N"), "value" (0/1, mismo valor que devolvía la función original de Jhon) } }`. Wireing Node completo (`POST /catalogs/validate-reentry`) y probado con FAKE_DB (2026-07-29).
 
-Manejo de errores en español: `FN_MENSAJE_ERROR_ES` (dentro del mismo paquete) traduce los códigos Oracle más comunes (tabla no existe, sin privilegios, timeout/pérdida de conexión) a mensajes claros en español. Del lado Node, `src/shared/oracle/catalog-pkg-assert.ts` es el equivalente reutilizable — separado de `pkg-assert.ts` (que sigue en inglés) para no romper el contrato de errores ya probado en employee/position/company/etc.
+⚠️ **Supuesto pendiente de confirmar:** se asume que `FTD_INGRESOS` vive en el esquema `INFOCENT` (igual que el resto de tablas de este paquete) con columnas `NUMERO_DOCUMENTO` y `REINGRESO` — Jhon las pasó sin calificar esquema en su query. Ajustar el nombre de tabla en `PRC_VALIDATE_REENTRY` si en realidad vive en otro esquema.
+
+**14ª-19ª (2026-07-29) — NMT035/NMT036 confirmadas + 4 tipos de institución NMT020 adicionales:**
+- `INFOCENT.NMT035` (→ `termination-reasons`): `CODDES`, `DESDE1`, `DESDE2`, `IMPLIQ`, `CLASSO` + auditoría. Causales de retiro/terminación (ej. "TERMINACION POR ABANDONO DE CARGO", "RENUNCIA POR PARTE DEL TRABAJADOR"). `IMPLIQ`/`CLASSO` se exponen literales — significado de negocio no confirmado. Sin filtros. ✅ Confirmada (DESCRIBE + SELECT reales).
+- `INFOCENT.NMT036` (→ `change-reasons`): `CODCAM`, `DESCAM` + auditoría. Motivos de cambio/movimiento (ej. "PROMOCION", "DECRETO PRESIDENCIAL", "CONTRATO", "INGRESO", "MERITO"). Sin filtros. ✅ Confirmada.
+- `INFOCENT.NMT020` — 4 tipos de institución adicionales, solo Colombia, mismo patrón que `banks` (`TIPI_CODTIP='01'`): AFP → `pension-funds` (`TIPI_CODTIP='PE'`), EPS → `health-providers` (`'SA'`), Caja de Compensación → `compensation-funds` (`'CA'`), Fondo de Cesantías → `severance-funds` (`'CE'`, tipo nuevo no visto antes). Las 4 reutilizan `PRC_PARSE_BANKS_FILTER` (genérico) y las mismas columnas/JSON que `banks`. ✅ Confirmadas.
+
+**20ª (2026-07-29) — `INFOCENT.EO_CONTRATO_TRABAJO` (→ `contract-types`, "Contrato"):** ya con permisos, confirmada. Columnas: `ID_EMPRESA`, `ID`, `NOMBRE`, `ID_TIPO_CONTRATO`, `NUM_TOPE`, `DURACION_MAX`, `LAPSO_ESPERA`, `DURACION_MAX_ACUM`, `OBSERVACIONES` + auditoría. Scoped por `ID_EMPRESA` — `companyId` OPCIONAL (reutiliza `PRC_PARSE_BANKS_FILTER`). `NUM_TOPE`/`DURACION_MAX`/`LAPSO_ESPERA`/`DURACION_MAX_ACUM` se exponen literales — unidades (días/meses) no confirmadas. ✅ Confirmada y wireing Node probado con FAKE_DB.
+
+**Pendiente:**
+- Confirmar esquema real de `FTD_INGRESOS` (ver nota arriba) antes de compilar `PRC_VALIDATE_REENTRY` contra QA.
+- Confirmar el `DOMAIN` correcto de `cities` (`SPI_REF`) — pendiente de conversación del usuario con la persona que dio la información original.
+- Recompilar `pkg_management_catalogs_api.sql` en QA Colombia (ya trae los 7 catálogos nuevos + reingreso) y capturar evidencia Postman real de los 7 catálogos agregados 2026-07-29 (hoy solo probados con FAKE_DB).
+
+**Bug corregido (2026-07-29) — filtros opcionales bloqueados del lado Node:** los filtros opcionales ya existían en Oracle (`PRC_PARSE_*_FILTER`: `companyId`, `countryCode`, `stateCode`, `municipalityId`, `payrollTypeCode`) pero `ListCatalogDto` (Node) solo whitelisteaba `page`/`size` — cualquier otro campo se rechazaba con `400 property X should not exist` antes de llegar a Oracle. Se corrigió agregando esos campos como opcionales al DTO y reenviándolos por toda la cadena (`controller` → `service` → `repository` → `I_JSON`). Verificado con FAKE_DB: `branches/list` con `companyId` ya no da 400.
+
+Manejo de errores en español: `PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE` (paquete único compartido, ver sección arriba) traduce los códigos Oracle más comunes a mensajes claros en español. Del lado Node, `src/shared/oracle/catalog-pkg-assert.ts` es el equivalente reutilizable — separado de `pkg-assert.ts` (que sigue en inglés) para no romper el contrato de errores ya probado en employee/position/company/etc. `DATA_ERROR_CODES` (catalog-pkg-assert.ts) se amplió (2026-07-29) para que los códigos "culpa del caller" (`-1722` número inválido, `-1830`/`-1858`/`-1861` formato de fecha) también devuelvan su mensaje específico en el 422, no solo un 500 genérico.
 
 ## Compilar
 

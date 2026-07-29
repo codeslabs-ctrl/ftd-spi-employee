@@ -1,3 +1,4 @@
+import { CatalogFilters } from './catalog.definitions';
 import { CatalogsRepository } from './catalogs.repository';
 import { InMemoryCatalogsRepository } from './in-memory-catalogs.repository';
 
@@ -6,8 +7,18 @@ export type CatalogsRepo = CatalogsRepository | InMemoryCatalogsRepository;
 export class CatalogsService {
   constructor(private readonly repo: CatalogsRepo) {}
 
-  findAll(country: string, catalogKey: string, page: number, size: number) {
-    return this.repo.findAll(country, catalogKey, page, size);
+  findAll(
+    country: string,
+    catalogKey: string,
+    page: number,
+    size: number,
+    filters: CatalogFilters = {},
+  ) {
+    return this.repo.findAll(country, catalogKey, page, size, filters);
+  }
+
+  validateReentry(country: string, numIden: string, reingreso: 'SI' | 'NO') {
+    return this.repo.validateReentry(country, numIden, reingreso);
   }
 }
 

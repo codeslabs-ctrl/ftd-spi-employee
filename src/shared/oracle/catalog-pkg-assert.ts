@@ -8,7 +8,15 @@ import {
   unprocessable,
 } from '../errors/http-error';
 
-const DATA_ERROR_CODES = new Set([-1, -1400, -2290, -2291, -2292, -12899]);
+// Códigos donde el mensaje de PKG_GLOBAL_ERRORS es "culpa del caller" (dato
+// mal enviado) y por eso SÍ vale la pena mostrárselo tal cual en el 422 —
+// a diferencia de errores de esquema/infraestructura (-904, -1017, -12154,
+// concurrencia, etc.) que se registran en el log con su mensaje detallado
+// pero al caller solo se le devuelve un 500 genérico (no son su culpa ni
+// algo que pueda corregir reintentando con otros datos).
+const DATA_ERROR_CODES = new Set([
+  -1, -1400, -1722, -1830, -1858, -1861, -2290, -2291, -2292, -12899,
+]);
 
 /**
  * Variante en español de pkg-assert.ts, pensada para ser reutilizable por
@@ -85,4 +93,16 @@ export function parseCatalogJsonArray(
 ): Record<string, unknown>[] {
   if (!json) return [];
   return (JSON.parse(json)[key] ?? []) as Record<string, unknown>[];
+}
+
+/**
+ * Igual que parseCatalogJsonArray pero para respuestas de un solo objeto
+ * (no una lista), ej. { "reentry": { ... } } de PRC_VALIDATE_REENTRY.
+ */
+export function parseCatalogJsonObject(
+  json: string | null,
+  key: string,
+): Record<string, unknown> {
+  if (!json) return {};
+  return (JSON.parse(json)[key] ?? {}) as Record<string, unknown>;
 }

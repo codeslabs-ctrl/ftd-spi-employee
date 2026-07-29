@@ -24,6 +24,13 @@ const CATALOGS = [
   { key: 'banks', label: 'Banks (validación de banco)' },
   { key: 'account-types', label: 'Account types (tipos de cuenta)' },
   { key: 'id-types', label: 'ID types (tipos de identificación)' },
+  { key: 'termination-reasons', label: 'Termination reasons (causales de retiro)' },
+  { key: 'change-reasons', label: 'Change reasons (motivos de cambio)' },
+  { key: 'pension-funds', label: 'Pension funds / AFP (solo Colombia)' },
+  { key: 'health-providers', label: 'Health providers / EPS (solo Colombia)' },
+  { key: 'compensation-funds', label: 'Compensation funds / Caja de Compensación (solo Colombia)' },
+  { key: 'severance-funds', label: 'Severance funds / Fondo de Cesantías (solo Colombia)' },
+  { key: 'contract-types', label: 'Contract types (Contrato)' },
 ];
 
 const authHeaders = [
@@ -174,6 +181,24 @@ const collection = {
       description:
         'Cifrado de payload con CryptoJS.AES. Pre-request cifra en RequestJson; test descifra ResponseJson.',
       item: [...CATALOGS.map(listItem), invalidCipher('catalogs/countries/list')],
+    },
+    {
+      name: 'Validate reentry (P2C, cifrado)',
+      description:
+        'PRC_VALIDATE_REENTRY — único endpoint de catalogs que escribe (corrige FTD_INGRESOS si hace falta).',
+      item: [
+        encItem(
+          'Validate reentry — declared SI, no exists -> corrige a NO (200)',
+          'catalogs/validate-reentry',
+          ["const payload = { numIden: '1234567890', reingreso: 'SI' };"],
+          200,
+          [
+            "pm.test('respuesta trae reingreso final', () => pm.expect(clear.reingreso).to.be.oneOf(['SI', 'NO']));",
+            "pm.test('respuesta trae flag corrected', () => pm.expect(clear.corrected).to.be.a('boolean'));",
+          ],
+        ),
+        invalidCipher('catalogs/validate-reentry'),
+      ],
     },
     {
       name: 'Negative cases',

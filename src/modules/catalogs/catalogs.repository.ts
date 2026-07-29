@@ -10,8 +10,17 @@ import {
   assertCatalogPkgSuccess,
   mapCatalogOracleError,
   parseCatalogJsonArray,
+  parseCatalogJsonObject,
 } from '../../shared/oracle/catalog-pkg-assert';
-import { findCatalogDefinition } from './catalog.definitions';
+import { CatalogFilters, findCatalogDefinition } from './catalog.definitions';
+
+export interface ReentryResult {
+  numIden: string;
+  declaredReingreso: 'SI' | 'NO';
+  reingreso: 'SI' | 'NO';
+  corrected: boolean;
+  value: number;
+}
 
 /**
  * Repositorio único para todos los catálogos: todos comparten el mismo
@@ -47,13 +56,21 @@ export class CatalogsRepository {
     catalogKey: string,
     page: number,
     size: number,
+    filters: CatalogFilters = {},
   ) {
     const def = findCatalogDefinition(catalogKey);
+    // Solo se mandan las claves que sí vienen — un PRC_PARSE_*_FILTER que no
+    // conoce un campo simplemente lo ignora, pero evitamos mandar `undefined`
+    // como valor explícito en el JSON.
+    const inJson: Record<string, unknown> = { page, size };
+    for (const [k, v] of Object.entries(filters)) {
+      if (v !== undefined) inJson[k] = v;
+    }
     return this.withConn(country, async (conn) => {
       const res: OraclePkgResult = await callOraclePkg(conn, {
         packageName: this.pkg,
         procedure: def.procedure,
-        inJson: { page, size },
+        inJson,
         withOutJson: true,
         callTimeoutMs: this.callTimeoutMs,
       });
@@ -65,6 +82,38 @@ export class CatalogsRepository {
         page,
         size,
         items: parseCatalogJsonArray(res.json, def.jsonKey),
+      };
+    });
+  }
+
+  /**
+   * "Validar reingreso" (PRC_VALIDATE_REENTRY) — único caso de este módulo
+   * que NO es una lista de solo lectura: valida la cédula contra
+   * EO_PERSONA/TA_RELACION_LABORAL y, si lo declarado por el caller no
+   * coincide, el PKG corrige INFOCENT.FTD_INGRESOS.REINGRESO (UPDATE +
+   * COMMIT del lado Oracle). Ver db/pkg_management_catalogs_api.sql.
+   */
+  async validateReentry(
+    country: string,
+    numIden: string,
+    reingreso: 'SI' | 'NO',
+  ): Promise<ReentryResult> {
+    return this.withConn(country, async (conn) => {
+      const res: OraclePkgResult = await callOraclePkg(conn, {
+        packageName: this.pkg,
+        procedure: 'prc_validate_reentry',
+        inJson: { numIden, reingreso },
+        withOutJson: true,
+        callTimeoutMs: this.callTimeoutMs,
+      });
+      assertCatalogPkgSuccess(res, this.successCode, this.noRecordsCode);
+      const obj = parseCatalogJsonObject(res.json, 'reentry');
+      return {
+        numIden: String(obj.numIden ?? numIden),
+        declaredReingreso: (obj.declaredReingreso ?? reingreso) as 'SI' | 'NO',
+        reingreso: obj.reingreso as 'SI' | 'NO',
+        corrected: obj.corrected === 'S',
+        value: Number(obj.value),
       };
     });
   }
