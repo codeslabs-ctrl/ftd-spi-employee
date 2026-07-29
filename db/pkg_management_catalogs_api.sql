@@ -3,12 +3,12 @@
 -- Esquema destino: people_one | Oracle 12.1.0.2
 -- Contrato FTD: I_JSON CLOB -> O_JSON CLOB / O_COD / O_MESSAGE
 --
--- MANEJO DE ERRORES EN ESPAÑOL (reutilizable): FN_GET_ERROR_MESSAGE traduce
--- los códigos Oracle más comunes (tabla no existe, sin privilegios, timeout
--- de conexión, conexión perdida) a un mensaje claro en español; cualquier
--- otro error cae a un mensaje genérico en español con el detalle técnico
--- acotado. Este helper es independiente del resto de paquetes (que siguen
--- devolviendo sus mensajes tal cual) para no romper contratos ya probados.
+-- MANEJO DE ERRORES EN ESPAÑOL: se delega a PKG_GLOBAL_ERRORS.FN_GET_ERROR_
+-- MESSAGE (paquete único, compartido por todos los PKG_MANAGEMENT_*), que
+-- traduce los códigos Oracle más comunes (tabla no existe, sin privilegios,
+-- timeout de conexión, conexión perdida) a un mensaje claro en español;
+-- cualquier otro error cae a un mensaje genérico en español con el detalle
+-- técnico acotado. Compilar PKG_GLOBAL_ERRORS antes que este paquete.
 --------------------------------------------------------------------------------
 
 CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_CATALOGS AS
@@ -105,42 +105,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       RETURN '"' || P_KEY || '":"' || FN_JSON_ESCAPE(P_VAL) || '"';
     END IF;
   END FN_JSON_PAIR_CC;
-
-  /*=========================================================================
-   [FN_GET_ERROR_MESSAGE] — Traducción de errores Oracle comunes a español,
-   reutilizable por cualquier procedimiento de este paquete. Para códigos no
-   mapeados explícitamente, cae a un mensaje genérico en español con el
-   detalle técnico acotado (para poder diagnosticar sin exponer de más).
-  ==========================================================================*/
-  FUNCTION FN_GET_ERROR_MESSAGE(P_SQLCODE  IN NUMBER,
-                                P_SQLERRM  IN VARCHAR2,
-                                P_CONTEXT  IN VARCHAR2) RETURN VARCHAR2 IS
-  BEGIN
-    CASE
-      WHEN P_SQLCODE = -942 THEN
-        RETURN 'La tabla del catálogo "' || P_CONTEXT ||
-               '" no existe o el usuario de conexión no tiene permisos ' ||
-               'para consultarla (verificar GRANT SELECT directo, no por rol).';
-      WHEN P_SQLCODE = -1031 THEN
-        RETURN 'No se tienen privilegios suficientes para consultar el ' ||
-               'catálogo "' || P_CONTEXT || '".';
-      WHEN P_SQLCODE = -12154 THEN
-        RETURN 'No se pudo resolver el identificador de conexión (TNS) a ' ||
-               'la base de datos.';
-      WHEN P_SQLCODE IN (-12170, -12535) THEN
-        RETURN 'Tiempo de espera agotado al conectar con la base de datos.';
-      WHEN P_SQLCODE IN (-3113, -3114) THEN
-        RETURN 'Se perdió la conexión con la base de datos durante la ' ||
-               'consulta del catálogo "' || P_CONTEXT || '".';
-      WHEN P_SQLCODE = -1 THEN
-        RETURN 'Ya existe un registro con esa clave en "' || P_CONTEXT || '".';
-      WHEN P_SQLCODE IN (100, -1403) THEN
-        RETURN 'No se encontraron registros para el criterio de consulta.';
-      ELSE
-        RETURN 'Error al consultar el catálogo "' || P_CONTEXT || '": ' ||
-               SUBSTR(P_SQLERRM, 1, 300);
-    END CASE;
-  END FN_GET_ERROR_MESSAGE;
 
   /*=========================================================================
    [PRC_PARSE_PAGE] — parseo compartido de page/size para catálogos sin
@@ -242,7 +206,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.SPI_REF');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.SPI_REF');
   END PRC_GET_CITIES;
 
   /*=========================================================================
@@ -371,7 +335,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
                                         'INFOCENT.EO_TIPO_NOMINA');
   END PRC_GET_PAYROLL_TYPES;
 
@@ -441,7 +405,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT022');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT022');
   END PRC_GET_ACCOUNT_TYPES;
 
   /*=========================================================================
@@ -507,7 +471,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
                                         'INFOCENT.EO_TIPO_IDENTIFICACION');
   END PRC_GET_ID_TYPES;
 
@@ -572,7 +536,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.SPI_PAISES');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.SPI_PAISES');
   END PRC_GET_COUNTRIES;
 
   /*=========================================================================
@@ -749,7 +713,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT002');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT002');
   END PRC_GET_LOCALITIES;
 
   /*=========================================================================
@@ -842,7 +806,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
                                         'INFOCENT.SPI_ENTIDAD_FEDERAL');
   END PRC_GET_STATES;
 
@@ -945,7 +909,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
                                         'INFOCENT.SPI_MUNICIPIOS');
   END PRC_GET_MUNICIPALITIES;
 
@@ -1040,7 +1004,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
                                         'INFOCENT.SPI_PARROQUIAS');
   END PRC_GET_PARISHES;
 
@@ -1155,7 +1119,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT023');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT023');
   END PRC_GET_GROUPS;
 
   /*=========================================================================
@@ -1255,7 +1219,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT038');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT038');
   END PRC_GET_BRANCHES;
 
   /*=========================================================================
@@ -1379,7 +1343,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
         DBMS_LOB.FREETEMPORARY(V_ARRAY);
       END IF;
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
-      O_MESSAGE := FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT020');
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'INFOCENT.NMT020');
   END PRC_GET_BANKS;
 
 END PKG_MANAGEMENT_CATALOGS;

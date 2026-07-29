@@ -4,6 +4,10 @@ const path = require('path');
 const oracledb = require('oracledb');
 
 const FILES = [
+  // PKG_GLOBAL_ERRORS va primero: el resto de paquetes lo llaman sin
+  // calificar esquema (PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE) desde su
+  // WHEN OTHERS, así que tiene que existir antes de compilarlos.
+  'pkg_global_errors_api.sql',
   'pkg_management_position_api.sql',
   'pkg_management_company_api.sql',
   'pkg_management_marital_status_api.sql',

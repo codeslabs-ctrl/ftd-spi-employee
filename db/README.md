@@ -3,6 +3,16 @@
 Scripts para esquema de conexión **`people_one`** (QA: `NOMQAVE`).  
 Contrato: `I_JSON CLOB → O_JSON? / O_COD / O_MESSAGE` (mismos códigos que Employee).
 
+## `pkg_global_errors_api.sql` — manejo de errores en español (paquete único, compartido)
+
+`PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(P_SQLCODE, P_SQLERRM, P_CONTEXT)` centraliza la traducción de errores Oracle comunes (tabla no existe, sin privilegios, timeout/pérdida de conexión, clave duplicada, sin registros) a un mensaje en español, con fallback genérico para el resto. Antes cada paquete (`catalogs`, `company`, `employee`, `job-post`, `marital-status`, `org-unit`, `position`) tenía su propia copia idéntica de esta función; se centralizó en un solo paquete (2026-07-28) para que agregar o ajustar un mapeo de código Oracle se haga en un solo lugar y se replique a todos los paquetes que lo llaman, en vez de tener que editar 7 archivos cada vez.
+
+Todos los `PKG_MANAGEMENT_*` la llaman calificada (`PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(...)`) desde su bloque `WHEN OTHERS`, pasando la tabla/recurso afectado como contexto (p. ej. `'INFOCENT.EO_EMPRESA'`). **Compilar `pkg_global_errors_api.sql` antes que cualquier otro paquete** — ya está primero en `scripts/compile-pkgs.js`.
+
+`PKG_MANAGEMENT_EMPLOYEE` vive en el esquema `CORSOX` (no `people_one`) y también llama a `PKG_GLOBAL_ERRORS` sin calificar esquema, igual que ya hace con `PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO` — si `PKG_GLOBAL_CONSTANTS` ya es visible desde `CORSOX` (sinónimo público o `GRANT EXECUTE` cruzado), `PKG_GLOBAL_ERRORS` necesita el mismo grant para que compile ahí.
+
+**Códigos Oracle mapeados (2026-07-28):** objeto/privilegios (`-942` tabla no existe, `-1031` sin privilegios, `-904` columna inválida, `-911` carácter inválido), conexión (`-12154` TNS, `-1017` usuario/clave, `-12170`/`-12535` timeout, `-3113`/`-3114` conexión perdida, `-25408` replay inseguro), concurrencia (`-54` registro bloqueado, `-60` deadlock, `-1013` operación cancelada), integridad de datos (`-1` clave duplicada, `-2291` FK — padre no encontrado, `-2292` FK — hijos dependientes, `-1400` NOT NULL, `-1722` número inválido, `-1830`/`-1858`/`-1861` formato de fecha, `-12899` valor muy largo, `-6502` error numérico/buffer PL-SQL), aplicación (`-20000..-20999` de `RAISE_APPLICATION_ERROR`, devuelve el mensaje de negocio tal cual se lanzó) y sin datos (`100`/`-1403`). Cualquier otro código cae al mensaje genérico con el `SQLERRM` acotado a 300 caracteres.
+
 ## Tablas verificadas en QA (2026-07-16)
 
 | Recurso | PKG | Tabla | Estado |
