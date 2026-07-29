@@ -52,6 +52,28 @@ export function mapOracleError(
       String(ora.message ?? '').replace(/^ORA-\d+:\s*/, ''),
     );
   }
+  // These fail at parse/bind time of `BEGIN <pkg>.<proc>(...); END;` — the
+  // package's own WHEN OTHERS never runs, so they must be told apart from a
+  // generic connection failure: the real cause is the object doesn't exist
+  // or won't compile, not the network.
+  if (ora?.errorNum === 6550 && /PLS-00201/.test(String(ora.message))) {
+    return internalError(
+      `Database procedure or package "${pkg}" does not exist, or the ` +
+        'connection user lacks privileges to see it (check name and GRANT EXECUTE).',
+    );
+  }
+  if (ora?.errorNum === 4063) {
+    return internalError(
+      `Database package "${pkg}" exists but has compilation errors — it ` +
+        'needs to be recompiled.',
+    );
+  }
+  if (ora?.errorNum === 6508) {
+    return internalError(
+      `Could not find the program unit for package "${pkg}" — it may have ` +
+        'been invalidated after compiling; recompile and retry.',
+    );
+  }
   return internalError();
 }
 

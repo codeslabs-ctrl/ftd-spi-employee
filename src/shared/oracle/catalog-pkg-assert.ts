@@ -82,6 +82,29 @@ export function mapCatalogOracleError(e: unknown, pkg: string): Error {
         'Los datos enviados no son válidos.',
     );
   }
+  // Estos tres NO son errores de conexión: el `conn.execute(BEGIN <pkg>.<proc>...)`
+  // falla al parsear/resolver el bloque anónimo antes de que el paquete llegue
+  // a ejecutarse, así que su propio WHEN OTHERS (PKG_GLOBAL_ERRORS) nunca corre.
+  // Hay que distinguirlos explícitamente del genérico "no se pudo conectar",
+  // porque la causa real es que el objeto no existe / no compila, no la red.
+  if (ora?.errorNum === 6550 && /PLS-00201/.test(String(ora.message))) {
+    return internalError(
+      `El procedimiento o paquete de base de datos "${pkg}" no existe, o el ` +
+        'usuario de conexión no tiene permisos para verlo (revisar nombre y GRANT EXECUTE).',
+    );
+  }
+  if (ora?.errorNum === 4063) {
+    return internalError(
+      `El paquete de base de datos "${pkg}" existe pero tiene errores de ` +
+        'compilación — es necesario recompilarlo (revisar en SQL Developer).',
+    );
+  }
+  if (ora?.errorNum === 6508) {
+    return internalError(
+      `No se encontró la unidad de programa del paquete "${pkg}" — pudo ` +
+        'haber sido invalidado luego de compilarse; recompilar y reintentar.',
+    );
+  }
   return internalError(
     'No se pudo conectar con la base de datos. Intente nuevamente más tarde.',
   );

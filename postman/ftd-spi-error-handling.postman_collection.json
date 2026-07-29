@@ -426,6 +426,7 @@
     },
     {
       "name": "3. Validar reingreso — validaciones de negocio (400)",
+      "description": "El middleware de cifrado P2C es simétrico: si el request llegó con RequestJson válido, TODA respuesta (incluyendo errores 400 de class-validator) sale envuelta en { ResponseJson }. Por eso estos tests usan encItemDecrypt (descifran antes de revisar \"errors\"), igual que el folder 2 — no encItem crudo.",
       "item": [
         {
           "name": "reingreso inválido (400)",
@@ -449,7 +450,10 @@
                 "exec": [
                   "pm.test('status 400', () => pm.response.to.have.status(400));",
                   "const key = pm.collectionVariables.get('payloadKey');",
-                  "pm.test('mensaje de validacion', () => { const b = pm.response.json(); pm.expect(b.errors.join(' ')).to.include('reingreso'); });"
+                  "const enc = pm.response.json().ResponseJson;",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('mensaje de validacion', () => pm.expect(clear.errors.join(' ')).to.include('reingreso'));"
                 ]
               }
             }
@@ -504,7 +508,10 @@
                 "exec": [
                   "pm.test('status 400', () => pm.response.to.have.status(400));",
                   "const key = pm.collectionVariables.get('payloadKey');",
-                  "pm.test('mensaje de validacion', () => { const b = pm.response.json(); pm.expect(b.errors.join(' ')).to.include('numIden'); });"
+                  "const enc = pm.response.json().ResponseJson;",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('mensaje de validacion', () => pm.expect(clear.errors.join(' ')).to.include('numIden'));"
                 ]
               }
             }
@@ -558,7 +565,11 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 400', () => pm.response.to.have.status(400));",
-                  "const key = pm.collectionVariables.get('payloadKey');"
+                  "const key = pm.collectionVariables.get('payloadKey');",
+                  "const enc = pm.response.json().ResponseJson;",
+                  "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
+                  "console.log('ResponseJson (descifrado):', clear);",
+                  "pm.test('trae errores de ambos campos', () => { const joined = clear.errors.join(' '); pm.expect(joined).to.include('numIden'); pm.expect(joined).to.include('reingreso'); });"
                 ]
               }
             }

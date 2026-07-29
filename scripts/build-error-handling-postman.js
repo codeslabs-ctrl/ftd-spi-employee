@@ -262,31 +262,39 @@ const collection = {
     },
     {
       name: '3. Validar reingreso — validaciones de negocio (400)',
+      description:
+        'El middleware de cifrado P2C es simétrico: si el request llegó con ' +
+        'RequestJson válido, TODA respuesta (incluyendo errores 400 de ' +
+        'class-validator) sale envuelta en { ResponseJson }. Por eso estos ' +
+        'tests usan encItemDecrypt (descifran antes de revisar "errors"), ' +
+        'igual que el folder 2 — no encItem crudo.',
       item: [
-        encItem(
+        encItemDecrypt(
           'reingreso inválido (400)',
           'catalogs/validate-reentry',
           ["const payload = { numIden: '1234567890', reingreso: 'MAYBE' };"],
           400,
           [
-            "pm.test('mensaje de validacion', () => { const b = pm.response.json(); pm.expect(b.errors.join(' ')).to.include('reingreso'); });",
+            "pm.test('mensaje de validacion', () => pm.expect(clear.errors.join(' ')).to.include('reingreso'));",
           ],
         ),
-        encItem(
+        encItemDecrypt(
           'numIden vacío (400)',
           'catalogs/validate-reentry',
           ["const payload = { numIden: '', reingreso: 'SI' };"],
           400,
           [
-            "pm.test('mensaje de validacion', () => { const b = pm.response.json(); pm.expect(b.errors.join(' ')).to.include('numIden'); });",
+            "pm.test('mensaje de validacion', () => pm.expect(clear.errors.join(' ')).to.include('numIden'));",
           ],
         ),
-        encItem(
+        encItemDecrypt(
           'body vacío — faltan ambos campos (400)',
           'catalogs/validate-reentry',
           ['const payload = {};'],
           400,
-          [],
+          [
+            "pm.test('trae errores de ambos campos', () => { const joined = clear.errors.join(' '); pm.expect(joined).to.include('numIden'); pm.expect(joined).to.include('reingreso'); });",
+          ],
         ),
       ],
     },
