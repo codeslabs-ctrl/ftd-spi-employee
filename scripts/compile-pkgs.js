@@ -14,6 +14,7 @@ const FILES = [
   'pkg_management_job_post_api.sql',
   'pkg_management_org_unit_api.sql',
   'pkg_management_catalogs_api.sql',
+  'pkg_management_employee_api.sql',
 ];
 
 function splitStatements(sql) {

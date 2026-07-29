@@ -1,6 +1,6 @@
 --------------------------------------------------------------------------------
 -- PKG_MANAGEMENT_EMPLOYEE — procedimientos del FTD SPI Employee API
--- Esquema: CORSOX | BD: SPI (espejo VE) | Oracle 12.1.0.2
+-- Esquema destino: people_one | BD: SPI (espejo VE) | Oracle 12.1.0.2
 -- Contrato estándar FTD: I_JSON CLOB -> O_JSON CLOB / O_COD / O_MESSAGE
 --
 -- COMPATIBILIDAD 12.1.0.2:
@@ -17,7 +17,7 @@
 --     SUCCESS_CODE / NO_RECORDS_CODE en src/employees/employees.repository.ts.
 --------------------------------------------------------------------------------
 
-CREATE OR REPLACE PACKAGE CORSOX.PKG_MANAGEMENT_EMPLOYEE AS
+CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_EMPLOYEE AS
 
   PROCEDURE PRC_GET_EMPLOYEE(I_JSON    IN CLOB,
                              O_JSON    OUT CLOB,
@@ -35,7 +35,7 @@ CREATE OR REPLACE PACKAGE CORSOX.PKG_MANAGEMENT_EMPLOYEE AS
 END PKG_MANAGEMENT_EMPLOYEE;
 /
 
-CREATE OR REPLACE PACKAGE BODY CORSOX.PKG_MANAGEMENT_EMPLOYEE AS
+CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_EMPLOYEE AS
 
   -- Nombre de la llave en INFOCENT.SPI_KEY para EO_PERSONA.ID
   GC_KEY_NAME CONSTANT VARCHAR2(30) := 'EOPERSONA';
@@ -132,14 +132,14 @@ CREATE OR REPLACE PACKAGE BODY CORSOX.PKG_MANAGEMENT_EMPLOYEE AS
                || FN_JSON_PAIR('lastName', R.APELLIDO1) || ','
                || FN_JSON_PAIR('secondLastName', R.APELLIDO2) || ','
                || FN_JSON_PAIR('birthDate', TO_CHAR(R.FECHA_NA, 'YYYY-MM-DD')) || ','
-               || FN_JSON_PAIR('gender', DECODE(R.SEXO, '1', 'M', '2', 'F', R.SEXO)) || ','
+               || FN_JSON_PAIR('gender', CASE R.SEXO WHEN '1' THEN 'M' WHEN '2' THEN 'F' ELSE R.SEXO END) || ','
                || FN_JSON_PAIR('maritalStatus', R.EDO_CIVIL) || ','
                || FN_JSON_PAIR('address', R.DIRECCION) || ','
                || FN_JSON_PAIR('city', R.CIUDAD) || ','
                || FN_JSON_PAIR('phone', R.TELEFONO1) || ','
                || FN_JSON_PAIR('mobile', R.CELULAR) || ','
                || FN_JSON_PAIR('email', R.E_MAIL1) || ','
-               || FN_JSON_PAIR('active', DECODE(NVL(R.IN_REL_TRAB, 'S'), 'N', 'N', 'S'))
+               || FN_JSON_PAIR('active', CASE NVL(R.IN_REL_TRAB, 'S') WHEN 'N' THEN 'N' ELSE 'S' END)
                || '}';
 
       DBMS_LOB.APPEND(V_ARRAY, V_ROW);
