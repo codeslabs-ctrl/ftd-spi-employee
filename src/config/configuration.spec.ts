@@ -38,4 +38,43 @@ describe('buildConfig', () => {
     } as unknown as NodeJS.ProcessEnv);
     expect(cfg.positionPkg).toBe('x.pkg_pos');
   });
+
+  // Pentest finding #31: CORS_ORIGINS in the deployed prod env included
+  // http://localhost:3000/4200 with Access-Control-Allow-Credentials:true.
+  // The real fix is removing them from the deployed env var, but this
+  // config-level filter is a safety net so they're never honored even if
+  // that slips through again.
+  describe('corsOrigins localhost filter (pentest #31)', () => {
+    it('keeps localhost origins outside production', () => {
+      const cfg = buildConfig({
+        NODE_ENV: 'development',
+        CORS_ORIGINS: 'http://localhost:3000,http://localhost:4200',
+      } as NodeJS.ProcessEnv);
+      expect(cfg.corsOrigins).toEqual([
+        'http://localhost:3000',
+        'http://localhost:4200',
+      ]);
+    });
+
+    it('strips localhost/127.0.0.1 origins when NODE_ENV=production', () => {
+      const cfg = buildConfig({
+        NODE_ENV: 'production',
+        CORS_ORIGINS:
+          'http://localhost:3000,http://127.0.0.1:4200,https://aplicaciones-vp-finanzas.uc.r.appspot.com',
+      } as NodeJS.ProcessEnv);
+      expect(cfg.corsOrigins).toEqual([
+        'https://aplicaciones-vp-finanzas.uc.r.appspot.com',
+      ]);
+    });
+
+    it('keeps legitimate production origins untouched', () => {
+      const cfg = buildConfig({
+        NODE_ENV: 'production',
+        CORS_ORIGINS: 'https://aplicaciones-vp-finanzas.uc.r.appspot.com',
+      } as NodeJS.ProcessEnv);
+      expect(cfg.corsOrigins).toEqual([
+        'https://aplicaciones-vp-finanzas.uc.r.appspot.com',
+      ]);
+    });
+  });
 });

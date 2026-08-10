@@ -12,7 +12,6 @@ import {
 } from './config/db/oracle/tenant-pools';
 import logger from './infrastructure/log/logger';
 import { errorHandlerMiddleware } from './interfaces/middlewares/errorHandler.middleware';
-import { payloadCryptoMiddleware } from './interfaces/middlewares/payload-crypto.middleware';
 import { requestLogger } from './interfaces/middlewares/requestLogger.middleware';
 import { apiRouter } from './interfaces/routes/index.route';
 
@@ -20,26 +19,56 @@ const cfg = getConfig();
 
 const app = express();
 
+// App Engine standard puts exactly one trusted reverse proxy (the Google
+// Frontend) in front of this service. Without this, Express's default
+// (trust proxy: false) makes req.ip resolve to the GFE's own address for
+// every request — collapsing express-rate-limit's per-IP buckets into one
+// shared bucket for all clients — while `1` (not `true`) makes it read the
+// single hop the GFE actually appends, instead of blindly trusting a
+// caller-supplied X-Forwarded-For chain (pentest finding: rate limit
+// keyed off an untrusted X-Forwarded-For header).
+app.set('trust proxy', 1);
+
 app.use(
   helmet({
     hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
   }),
 );
 
+// helmet doesn't set Permissions-Policy (its old Feature-Policy middleware
+// was removed) — set it explicitly. This is a pure API with no camera/mic/
+// geolocation/payment usage, so deny all.
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=()',
+  );
+  next();
+});
+
 app.use(express.json({ limit: cfg.bodyParserLimit }));
 app.use(
   express.urlencoded({ limit: cfg.bodyParserLimit, extended: true }),
 );
 
-// SPI P2C: RequestJson → clear body; ResponseJson on way out (optional)
-app.use(payloadCryptoMiddleware);
+// NOTE: payload crypto (RequestJson decrypt / ResponseJson encrypt) is
+// mounted INSIDE apiRouter (interfaces/routes/index.route.ts), AFTER the
+// auth+country gate — not here. Mounting it globally before auth let an
+// unauthenticated request with a garbage RequestJson body short-circuit
+// with 400 "Invalid encrypted payload" before ever reaching the JWT check,
+// instead of 401 (pentest finding: middleware order / CWE-287). Auth must
+// see every request before the crypto layer touches the body.
 
 if (cfg.corsOrigins.length) {
   app.use(
     cors({
       origin: cfg.corsOrigins,
       credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      // Every route in this API is GET (health) or POST (business
+      // endpoints) — no PUT/DELETE/PATCH handler exists anywhere, so don't
+      // advertise them in CORS preflight (pentest finding: unnecessary
+      // methods allowed).
+      methods: ['GET', 'POST', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Country-Code'],
       maxAge: 3600,
     }),
@@ -62,6 +91,14 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/ftd-spi-employee/rest', limiter);
+
+// Data returned here (employees, payroll-adjacent catalogs, org data) must
+// never be cached by intermediate proxies/CDNs (pentest finding: missing
+// Cache-Control on responses with sensitive data).
+app.use('/ftd-spi-employee/rest', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 app.get('/', (_req, res) => {
   res.send('Farmatodo C.A | ftd-spi-employee - API ✅');

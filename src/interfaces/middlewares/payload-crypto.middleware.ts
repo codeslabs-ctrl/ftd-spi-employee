@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
 import CryptoJS from 'crypto-js';
 import { getConfig } from '../../config/configuration';
-import { badRequest } from '../../shared/errors/http-error';
+import logger from '../../infrastructure/log/logger';
+import { badRequest, internalError } from '../../shared/errors/http-error';
 
 export const ENCRYPTED_FIELD = 'RequestJson';
 export const ENCRYPTED_RESPONSE_FIELD = 'ResponseJson';
@@ -52,6 +53,23 @@ export function payloadCryptoMiddleware(
 ): void {
   const cfg = getConfig();
   const key = cfg.payloadEncryptionKey;
+
+  // Misconfiguration guard: if ops sets REQUIRE_ENCRYPTED_PAYLOAD=true but
+  // forgets PAYLOAD_ENCRYPTION_KEY/AES_SECRET_KEY, `key` is '' and every
+  // check below that gates on `key` being truthy silently falls through —
+  // the app would accept plaintext everywhere despite being told not to,
+  // with no error anywhere. Fail loud instead of failing open.
+  if (
+    cfg.requireEncryptedPayload &&
+    !key &&
+    !ENCRYPTION_EXEMPT_PATHS.has(req.path)
+  ) {
+    logger.error(
+      'REQUIRE_ENCRYPTED_PAYLOAD=true but PAYLOAD_ENCRYPTION_KEY/AES_SECRET_KEY is not set — refusing business traffic instead of silently accepting it unencrypted.',
+    );
+    return next(internalError('Server misconfiguration'));
+  }
+
   const encryptedInput =
     !!key &&
     req.body &&

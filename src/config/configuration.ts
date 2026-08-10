@@ -93,10 +93,22 @@ export function buildConfig(env: NodeJS.ProcessEnv): AppConfig {
      * Defaults to false to preserve the existing "plain requests still work"
      * contract (tested in employees.e2e-spec.ts). */
     requireEncryptedPayload: env.REQUIRE_ENCRYPTED_PAYLOAD === 'true',
+    // Defense in depth: even if a dev/staging origin (localhost:*,
+    // 127.0.0.1:*) ends up in CORS_ORIGINS for a production deploy — as the
+    // pentest found (localhost:3000/4200 whitelisted with
+    // access-control-allow-credentials:true in prod) — never honor it once
+    // NODE_ENV=production. The real fix is removing it from the deployed
+    // CORS_ORIGINS value itself; this just stops it from being exploitable
+    // even if that config slips through again.
     corsOrigins: (env.CORS_ORIGINS ?? '')
       .split(',')
       .map((o) => o.trim())
-      .filter(Boolean),
+      .filter(Boolean)
+      .filter(
+        (o) =>
+          env.NODE_ENV !== 'production' ||
+          !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o),
+      ),
     employeePkg: env.EMPLOYEE_PKG ?? 'pkg_management_employee',
     pkgSuccessCode: env.PKG_SUCCESS_CODE ?? 'FTD-200',
     pkgNoRecordsCode: env.PKG_NORECORDS_CODE ?? 'FTD-201',
