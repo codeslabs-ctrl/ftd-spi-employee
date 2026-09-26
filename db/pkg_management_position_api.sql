@@ -1,17 +1,11 @@
---------------------------------------------------------------------------------
--- PKG_MANAGEMENT_POSITION — Cargos (position)
--- Esquema destino: people_one | tablas: INFOCENT | Oracle 12.1.0.2
--- Contrato FTD: I_JSON CLOB -> O_JSON? / O_COD / O_MESSAGE
---
--- Tabla confirmada en QA (NOMQAVE): INFOCENT.EO_CARGO
---   ID_EMPRESA VARCHAR2(4), ID VARCHAR2(10), NOMBRE VARCHAR2(50),
---   ID_CLASIFICA/ID_CARGO_SUP VARCHAR2(10), DESCRIP/FUNCION/PROPOSITO/RIESGO VARCHAR2(1024)
---
--- Nota 12.1: V_ROW usa VARCHAR2(32767) porque DESCRIP+FUNCION+PROPOSITO+RIESGO
---   no caben en VARCHAR2(4000).
---------------------------------------------------------------------------------
+--------------------------------------------------------
+--  File created - Saturday-September-26-2026   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Package PKG_MANAGEMENT_POSITION
+--------------------------------------------------------
 
-CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_POSITION AS
+  CREATE OR REPLACE PACKAGE "PEOPLE_ONE"."PKG_MANAGEMENT_POSITION" AS
 
   PROCEDURE PRC_GET_POSITION(I_JSON    IN CLOB,
                              O_JSON    OUT CLOB,
@@ -23,9 +17,13 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_POSITION AS
                                O_MESSAGE OUT VARCHAR2);
 
 END PKG_MANAGEMENT_POSITION;
-/
 
-CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_POSITION AS
+/
+--------------------------------------------------------
+--  DDL for Package Body PKG_MANAGEMENT_POSITION
+--------------------------------------------------------
+
+  create or replace PACKAGE BODY PKG_MANAGEMENT_POSITION AS
 
   FUNCTION FN_JSON_ESCAPE(P_VAL IN VARCHAR2) RETURN VARCHAR2 IS
   BEGIN
@@ -226,4 +224,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_POSITION AS
   END PRC_MERGE_POSITION;
 
 END PKG_MANAGEMENT_POSITION;
+
+
+
 /

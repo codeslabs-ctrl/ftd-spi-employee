@@ -1,10 +1,11 @@
---------------------------------------------------------------------------------
--- PKG_MANAGEMENT_COMPANY — Empresas (company)
--- Esquema destino: people_one | tabla confirmada QA: INFOCENT.EO_EMPRESA
--- Contrato FTD: I_JSON CLOB -> O_JSON / O_COD / O_MESSAGE
---------------------------------------------------------------------------------
+--------------------------------------------------------
+--  File created - Saturday-September-26-2026   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Package PKG_MANAGEMENT_COMPANY
+--------------------------------------------------------
 
-CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_COMPANY AS
+  CREATE OR REPLACE PACKAGE "PEOPLE_ONE"."PKG_MANAGEMENT_COMPANY" AS
 
   PROCEDURE PRC_GET_COMPANY(I_JSON    IN CLOB,
                             O_JSON    OUT CLOB,
@@ -12,9 +13,10 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_COMPANY AS
                             O_MESSAGE OUT VARCHAR2);
 
 END PKG_MANAGEMENT_COMPANY;
+
 /
 
-CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_COMPANY AS
+create or replace PACKAGE BODY PKG_MANAGEMENT_COMPANY AS
 
   FUNCTION FN_JSON_ESCAPE(P_VAL IN VARCHAR2) RETURN VARCHAR2 IS
   BEGIN
@@ -133,4 +135,3 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_COMPANY AS
   END PRC_GET_COMPANY;
 
 END PKG_MANAGEMENT_COMPANY;
-/

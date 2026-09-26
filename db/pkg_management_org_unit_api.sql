@@ -1,12 +1,11 @@
---------------------------------------------------------------------------------
--- PKG_MANAGEMENT_ORG_UNIT — Unidades organizativas (org-unit)
--- Esquema destino: people_one | tabla confirmada QA: INFOCENT.EO_UNIDAD
--- ID_EMPRESA VARCHAR2(4), ID VARCHAR2(16), NOMBRE VARCHAR2(40),
--- FUNCIONES VARCHAR2(1024), UBICA_ADMIN VARCHAR2(16), FECHA_INI NOT NULL,
--- MAX_PUESTO NUMBER(10)
---------------------------------------------------------------------------------
+--------------------------------------------------------
+--  File created - Saturday-September-26-2026   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Package PKG_MANAGEMENT_ORG_UNIT
+--------------------------------------------------------
 
-CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_ORG_UNIT AS
+  CREATE OR REPLACE PACKAGE "PEOPLE_ONE"."PKG_MANAGEMENT_ORG_UNIT" AS
 
   PROCEDURE PRC_GET_ORG_UNIT(I_JSON    IN CLOB,
                              O_JSON    OUT CLOB,
@@ -14,9 +13,13 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_ORG_UNIT AS
                              O_MESSAGE OUT VARCHAR2);
 
 END PKG_MANAGEMENT_ORG_UNIT;
-/
 
-CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_ORG_UNIT AS
+/
+--------------------------------------------------------
+--  DDL for Package Body PKG_MANAGEMENT_ORG_UNIT
+--------------------------------------------------------
+
+  create or replace PACKAGE BODY PKG_MANAGEMENT_ORG_UNIT AS
 
   FUNCTION FN_JSON_ESCAPE(P_VAL IN VARCHAR2) RETURN VARCHAR2 IS
   BEGIN
@@ -128,4 +131,5 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_ORG_UNIT AS
   END PRC_GET_ORG_UNIT;
 
 END PKG_MANAGEMENT_ORG_UNIT;
+
 /

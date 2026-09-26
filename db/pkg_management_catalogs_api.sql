@@ -145,8 +145,7 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_CATALOGS AS
 
 END PKG_MANAGEMENT_CATALOGS;
 /
-
-CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
+create or replace PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
 
   /*=========================================================================
    [FN_JSON_ESCAPE] — mismo helper que el resto de paquetes FTD (12.1.0.2:

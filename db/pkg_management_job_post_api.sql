@@ -1,22 +1,11 @@
---------------------------------------------------------------------------------
--- PKG_MANAGEMENT_JOB_POST — Puestos (job-post)
--- Esquema destino: people_one | tabla: INFOCENT.EO_PUESTO | Oracle 12.1.0.2
--- Contrato FTD: I_JSON CLOB -> O_JSON CLOB / O_COD / O_MESSAGE
---
--- Tabla confirmada (DESCRIBE INFOCENT.EO_PUESTO):
---   ID_EMPRESA VARCHAR2(4)  NOT NULL, ID_UNIDAD VARCHAR2(16) NOT NULL,
---   ID NUMBER(10) NOT NULL, NOMBRE VARCHAR2(40) NOT NULL,
---   ID_CARGO VARCHAR2(10) NOT NULL, DESCRIP/FUNCION/RIESGO VARCHAR2(1024),
---   FECHA_INI DATE NOT NULL, FECHA_FIN DATE,
---   USRCRE/USRACT VARCHAR2(60), FECCRE/FECACT DATE (no usadas por este API, solo lectura)
---
--- Reescrito en el mismo estilo que PKG_MANAGEMENT_POSITION (SELECT estático con
--- PRC_PARSE_FILTER + FOR loop) ahora que la tabla ya está confirmada — se retira
--- el SQL dinámico que se usaba como salvaguarda mientras no se sabía si existía.
--- Solo lectura (get/list); el API no expone create/update para este recurso.
---------------------------------------------------------------------------------
+--------------------------------------------------------
+--  File created - Saturday-September-26-2026   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Package PKG_MANAGEMENT_JOB_POST
+--------------------------------------------------------
 
-CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_JOB_POST AS
+  CREATE OR REPLACE EDITIONABLE PACKAGE "PEOPLE_ONE"."PKG_MANAGEMENT_JOB_POST" AS
 
   PROCEDURE PRC_GET_JOB_POST(I_JSON    IN CLOB,
                              O_JSON    OUT CLOB,
@@ -24,9 +13,13 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_JOB_POST AS
                              O_MESSAGE OUT VARCHAR2);
 
 END PKG_MANAGEMENT_JOB_POST;
-/
 
-CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_JOB_POST AS
+/
+--------------------------------------------------------
+--  DDL for Package Body PKG_MANAGEMENT_JOB_POST
+--------------------------------------------------------
+
+  create or replace PACKAGE BODY PKG_MANAGEMENT_JOB_POST AS
 
   FUNCTION FN_JSON_ESCAPE(P_VAL IN VARCHAR2) RETURN VARCHAR2 IS
   BEGIN
@@ -175,4 +168,5 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_JOB_POST AS
   END PRC_GET_JOB_POST;
 
 END PKG_MANAGEMENT_JOB_POST;
+
 /

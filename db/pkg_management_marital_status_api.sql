@@ -1,10 +1,11 @@
---------------------------------------------------------------------------------
--- PKG_MANAGEMENT_MARITAL_STATUS — Estado civil
--- Esquema destino: people_one | tabla confirmada QA: INFOCENT.EO_ESTADO_CIVIL
--- ID VARCHAR2(1), NOMBRE VARCHAR2(30), CODIGO_LEY VARCHAR2(1)
---------------------------------------------------------------------------------
+--------------------------------------------------------
+--  File created - Saturday-September-26-2026   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Package PKG_MANAGEMENT_MARITAL_STATUS
+--------------------------------------------------------
 
-CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_MARITAL_STATUS AS
+  CREATE OR REPLACE PACKAGE "PEOPLE_ONE"."PKG_MANAGEMENT_MARITAL_STATUS" AS
 
   PROCEDURE PRC_GET_MARITAL_STATUS(I_JSON    IN CLOB,
                                    O_JSON    OUT CLOB,
@@ -12,9 +13,13 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_MARITAL_STATUS AS
                                    O_MESSAGE OUT VARCHAR2);
 
 END PKG_MANAGEMENT_MARITAL_STATUS;
-/
 
-CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_MARITAL_STATUS AS
+/
+--------------------------------------------------------
+--  DDL for Package Body PKG_MANAGEMENT_MARITAL_STATUS
+--------------------------------------------------------
+
+  create or replace PACKAGE BODY PKG_MANAGEMENT_MARITAL_STATUS AS
 
   FUNCTION FN_JSON_ESCAPE(P_VAL IN VARCHAR2) RETURN VARCHAR2 IS
   BEGIN
@@ -106,4 +111,5 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_MARITAL_STATUS AS
   END PRC_GET_MARITAL_STATUS;
 
 END PKG_MANAGEMENT_MARITAL_STATUS;
+
 /

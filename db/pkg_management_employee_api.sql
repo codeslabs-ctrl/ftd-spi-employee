@@ -1,23 +1,11 @@
---------------------------------------------------------------------------------
--- PKG_MANAGEMENT_EMPLOYEE — procedimientos del FTD SPI Employee API
--- Esquema destino: people_one | BD: SPI (espejo VE) | Oracle 12.1.0.2
--- Contrato estándar FTD: I_JSON CLOB -> O_JSON CLOB / O_COD / O_MESSAGE
---
--- COMPATIBILIDAD 12.1.0.2:
---   * JSON_OBJECT / JSON_ARRAYAGG con RETURNING CLOB NO existe (llegó en 12.2).
---     -> el JSON de salida se arma a mano con FN_JSON_ESCAPE / FN_JSON_PAIR + DBMS_LOB.
---   * JSON_TABLE SÍ está soportado (se usa para parsear la entrada).
---   * OFFSET/FETCH SÍ está soportado (row limiting desde 12.1).
---
--- IDENTIFICADOR (EO_PERSONA.ID): no hay secuencia. Se obtiene de la tabla
---   INFOCENT.SPI_KEY (name_key = 'EOPERSONA') incrementando current_key.
---
--- AJUSTAR ANTES DE COMPILAR:
---   * Verificar valores de PKG_GLOBAL_CONSTANTS (éxito / sin registros) y alinear
---     SUCCESS_CODE / NO_RECORDS_CODE en src/employees/employees.repository.ts.
---------------------------------------------------------------------------------
+--------------------------------------------------------
+--  File created - Saturday-September-26-2026   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Package PKG_MANAGEMENT_EMPLOYEE
+--------------------------------------------------------
 
-CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_EMPLOYEE AS
+  CREATE OR REPLACE PACKAGE "PEOPLE_ONE"."PKG_MANAGEMENT_EMPLOYEE" AS
 
   PROCEDURE PRC_GET_EMPLOYEE(I_JSON    IN CLOB,
                              O_JSON    OUT CLOB,
@@ -35,7 +23,7 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_EMPLOYEE AS
 END PKG_MANAGEMENT_EMPLOYEE;
 /
 
-CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_EMPLOYEE AS
+create or replace PACKAGE BODY PKG_MANAGEMENT_EMPLOYEE AS
 
   -- Nombre de la llave en INFOCENT.SPI_KEY para EO_PERSONA.ID
   GC_KEY_NAME CONSTANT VARCHAR2(30) := 'EOPERSONA';
@@ -296,4 +284,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_MANAGEMENT_EMPLOYEE AS
   END PRC_DELETE_EMPLOYEE;
 
 END PKG_MANAGEMENT_EMPLOYEE;
+
+
 /
