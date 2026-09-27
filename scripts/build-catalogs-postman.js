@@ -116,6 +116,8 @@ function listItem(def) {
     [
       "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
       "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+      // paginate default (pedido PeopleOne 2026-09-23, ver ftd-spi-pagination-flag)
+      "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));",
     ],
   );
 }

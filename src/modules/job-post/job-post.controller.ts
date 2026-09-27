@@ -34,6 +34,7 @@ export const jobPostController = {
         dto.companyId,
         dto.unitId,
         dto.positionId,
+        dto.paginate ?? true,
       );
       res.status(200).json(result);
     } catch (e) {

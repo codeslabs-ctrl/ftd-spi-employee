@@ -82,6 +82,14 @@ post employee/get '{"idNumber":"12345678"}' | dec
 post employee/list '{"page":1,"size":20}' | dec
 ```
 
+#### 2.3.1 Listado SIN paginar (200) — `paginate:false` (2026-09-27, pedido PeopleOne)
+
+Igual en todos los `list` (employee, company, position, job-post, org-unit, marital-status y los 19 catálogos): ignora `page`/`size` y devuelve todo en un solo response — pensado para poblar comboBox sin tener que paginar dentro del combo. Default es `paginate:true` (comportamiento de siempre) si se omite el flag.
+
+```bash
+post employee/list '{"paginate":false}' | dec
+```
+
 ### 2.4 Actualizar (200)
 
 ```bash

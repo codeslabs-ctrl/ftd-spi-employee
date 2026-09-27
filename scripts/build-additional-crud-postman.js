@@ -227,6 +227,7 @@ const collection = {
           [
             "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
             "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+            "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));",
           ],
         ),
         encItem(
@@ -258,6 +259,7 @@ const collection = {
           [
             "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
             "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+            "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));",
           ],
         ),
         encItem(
@@ -283,6 +285,7 @@ const collection = {
           [
             "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
             "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+            "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));",
           ],
         ),
         invalidCipher('marital-status/list'),
@@ -301,6 +304,7 @@ const collection = {
           [
             "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
             "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+            "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));",
           ],
         ),
         encItem(
@@ -328,6 +332,7 @@ const collection = {
           [
             "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
             "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+            "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));",
           ],
         ),
         encItem(

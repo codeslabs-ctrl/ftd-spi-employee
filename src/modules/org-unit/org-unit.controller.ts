@@ -31,6 +31,7 @@ export const orgUnitController = {
         dto.page ?? 1,
         dto.size ?? 20,
         dto.companyId,
+        dto.paginate ?? true,
       );
       res.status(200).json(result);
     } catch (e) {

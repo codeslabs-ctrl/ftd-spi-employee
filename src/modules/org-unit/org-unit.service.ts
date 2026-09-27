@@ -1,3 +1,4 @@
+import { fetchAllPages } from '../../shared/utils/fetch-all-pages.util';
 import { InMemoryOrgUnitsRepository } from './in-memory-org-unit.repository';
 import { OrgUnitsRepository } from './org-unit.repository';
 
@@ -10,8 +11,21 @@ export class OrgUnitsService {
     return this.repo.findById(country, companyId, id);
   }
 
-  findAll(country: string, page: number, size: number, companyId?: string) {
-    return this.repo.findAll(country, page, size, companyId);
+  async findAll(
+    country: string,
+    page: number,
+    size: number,
+    companyId?: string,
+    paginate = true,
+  ) {
+    if (!paginate) {
+      const items = await fetchAllPages((p, s) =>
+        this.repo.findAll(country, p, s, companyId),
+      );
+      return { page: 1, size: items.length, paginate: false, items };
+    }
+    const result = await this.repo.findAll(country, page, size, companyId);
+    return { ...result, paginate: true };
   }
 }
 

@@ -1,5 +1,6 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -7,6 +8,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { toBooleanDefaultTrue } from '../../../shared/utils/to-boolean.util';
 
 export class ListJobPostsDto {
   @IsOptional()
@@ -37,4 +39,13 @@ export class ListJobPostsDto {
   @Min(1)
   @Max(100)
   size: number = 20;
+
+  /**
+   * true (default) = paginado de siempre. false = ignora page/size y
+   * devuelve todos los job posts en un solo response.
+   */
+  @IsOptional()
+  @Transform(({ obj }) => toBooleanDefaultTrue(obj.paginate))
+  @IsBoolean()
+  paginate: boolean = true;
 }

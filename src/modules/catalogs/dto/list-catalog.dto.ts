@@ -1,5 +1,14 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { toBooleanDefaultTrue } from '../../../shared/utils/to-boolean.util';
 
 /**
  * DTO único para los 18 catálogos de "list" (mismo factory de controller
@@ -55,4 +64,15 @@ export class ListCatalogDto {
   @IsString()
   @MaxLength(10)
   payrollTypeCode?: string;
+
+  /**
+   * true (default) = comportamiento paginado de siempre (page/size).
+   * false = ignora page/size y devuelve TODOS los registros del catálogo
+   * en un solo response (pedido de PeopleOne para poblar comboBox sin
+   * tener que paginar dentro del combo).
+   */
+  @IsOptional()
+  @Transform(({ obj }) => toBooleanDefaultTrue(obj.paginate))
+  @IsBoolean()
+  paginate: boolean = true;
 }

@@ -1,5 +1,6 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -7,6 +8,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { toBooleanDefaultTrue } from '../../../shared/utils/to-boolean.util';
 
 export class ListOrgUnitsDto {
   @IsOptional()
@@ -26,4 +28,13 @@ export class ListOrgUnitsDto {
   @Min(1)
   @Max(100)
   size: number = 20;
+
+  /**
+   * true (default) = paginado de siempre. false = ignora page/size y
+   * devuelve todas las unidades organizativas en un solo response.
+   */
+  @IsOptional()
+  @Transform(({ obj }) => toBooleanDefaultTrue(obj.paginate))
+  @IsBoolean()
+  paginate: boolean = true;
 }

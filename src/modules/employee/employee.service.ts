@@ -1,3 +1,4 @@
+import { fetchAllPages } from '../../shared/utils/fetch-all-pages.util';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { EmployeesRepository } from './employee.repository';
@@ -16,8 +17,15 @@ export class EmployeesService {
     return this.repo.findById(country, idNumber);
   }
 
-  findAll(country: string, page: number, size: number) {
-    return this.repo.findAll(country, page, size);
+  async findAll(country: string, page: number, size: number, paginate = true) {
+    if (!paginate) {
+      const items = await fetchAllPages((p, s) =>
+        this.repo.findAll(country, p, s),
+      );
+      return { page: 1, size: items.length, paginate: false, items };
+    }
+    const result = await this.repo.findAll(country, page, size);
+    return { ...result, paginate: true };
   }
 
   update(country: string, idNumber: string, dto: UpdateEmployeeDto) {

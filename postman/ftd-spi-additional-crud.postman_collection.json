@@ -255,7 +255,8 @@
                   "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
                   "console.log('ResponseJson (descifrado):', clear);",
                   "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+                  "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));"
                 ]
               }
             }
@@ -427,7 +428,8 @@
                   "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
                   "console.log('ResponseJson (descifrado):', clear);",
                   "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+                  "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));"
                 ]
               }
             }
@@ -597,7 +599,8 @@
                   "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
                   "console.log('ResponseJson (descifrado):', clear);",
                   "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+                  "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));"
                 ]
               }
             }
@@ -706,7 +709,8 @@
                   "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
                   "console.log('ResponseJson (descifrado):', clear);",
                   "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+                  "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));"
                 ]
               }
             }
@@ -876,7 +880,8 @@
                   "const clear = JSON.parse(CryptoJS.AES.decrypt(enc, key).toString(CryptoJS.enc.Utf8));",
                   "console.log('ResponseJson (descifrado):', clear);",
                   "pm.test('trae paginacion', () => pm.expect(clear.page).to.eql(1));",
-                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));"
+                  "pm.test('items es array', () => pm.expect(clear.items).to.be.an('array'));",
+                  "pm.test('paginate:true por defecto', () => pm.expect(clear.paginate).to.eql(true));"
                 ]
               }
             }

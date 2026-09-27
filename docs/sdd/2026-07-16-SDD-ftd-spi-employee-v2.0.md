@@ -29,6 +29,18 @@ Esta versión reemplaza al SDD v1.0 tras dos cambios mayores respecto al diseño
 
 El contrato de negocio (PKG-first sobre Oracle, contrato JSON en inglés, seguridad JWT RS256, cifrado P2C, multi-tenant por `X-Country-Code`) se conserva íntegro.
 
+### 1.1 Addendum 2026-09-27 — flag `paginate` en todos los endpoints de listado
+
+Pedido de PeopleOne (correo Andros Toro / Raymond, 2026-09-23): poblar un comboBox contra un endpoint paginado no es viable porque el consumidor no sabe si hay más datos. Se agregó un flag opcional `paginate` (boolean) a **todos** los endpoints `list` — los 6 de este documento (§7.2–7.4) más los 19 catálogos (`/catalogs/<key>/list`, ver `db/pkg_management_catalogs_api.sql` y `catalog.definitions.ts`, agregados después de este SDD el 2026-07-29):
+
+- `paginate` ausente o `true` (default): comportamiento idéntico al de siempre, `page`/`size` respetados.
+- `paginate: false`: ignora `page`/`size` y devuelve **todos** los registros del recurso en un solo response. Implementado 100% en Node (`src/shared/utils/fetch-all-pages.util.ts`, que reutiliza la misma llamada paginada del repositorio en un loop hasta agotar los datos) — **no requirió ningún cambio en los paquetes Oracle**.
+- La respuesta de `list` ahora siempre incluye el campo `paginate` (`true`/`false`) además de `page`/`size`/`items`, para que el consumidor sepa qué modo se usó.
+
+Se evaluó además agregar una búsqueda por palabra (`search`, case-insensitive) del lado del backend, pero se descartó: con `paginate:false` el frontend ya recibe el dataset completo y puede filtrar en memoria, sin que el backend necesite tocar Oracle para eso.
+
+Cobertura: unit tests (`fetch-all-pages.util.spec.ts`, `to-boolean.util.spec.ts`), e2e (`test/pagination-flag.e2e-spec.ts`) y colección Postman dedicada (`postman/ftd-spi-pagination-flag.postman_collection.json`).
+
 ## 2. Resumen ejecutivo
 
 `ftd-spi-employee` es un servicio **Express + TypeScript** que expone la gestión de datos maestros de RRHH del sistema SPI como API RESTful, con Venezuela y Colombia habilitados y Argentina preparada por configuración. Envuelve los paquetes Oracle existentes (estándar FTD: **PKG-first**) con el contrato `I_JSON CLOB → O_JSON CLOB / O_COD / O_MESSAGE`, aplica seguridad con JWT RS256 (TTL 12 h) y aísla los datos por región mediante el header `X-Country-Code`. El principio arquitectónico central es un **único despliegue multi-tenant en App Engine** con un connection pool `oracledb` por país, donde el header de país determina dinámicamente el enrutamiento a la base de datos correspondiente. Incorpora el estándar de seguridad de Farmatodo: **cifrado de payload front↔back con `crypto-js` (CryptoJS.AES, esquema P2C)**, rate limiting, HSTS y CORS restringido.
@@ -113,7 +125,7 @@ Emite el token de acceso. Único endpoint de negocio público (junto a health).
 Notas: credenciales inválidas → 401; body incompleto → 400; `expires_in` = `JWT_TTL_SECONDS` (12 h). Rate limit: 10 req/min (429).
 
 ### 7.2 employee — CRUD completo
-`create` (201 `{ idNumber, message }`), `get`, `list` (`{ page, size, items }`), `update`, `delete` (204). `get`/`update`/`delete` reciben `idNumber` en el body; `list` recibe `{ page, size }` (`size` máx. 100, default 20; `page` default 1). Ejemplo `create`:
+`create` (201 `{ idNumber, message }`), `get`, `list` (`{ page, size, paginate, items }`), `update`, `delete` (204). `get`/`update`/`delete` reciben `idNumber` en el body; `list` recibe `{ page, size, paginate? }` (`size` máx. 100, default 20; `page` default 1; `paginate` default `true` — ver §1.1). Ejemplo `create`:
 ```json
 { "idNumber": "12345678", "idType": "V", "nationality": "VENEZOLANO", "firstName": "MARIA",
   "lastName": "PEREZ", "birthDate": "1990-05-14", "gender": "F", "email": "maria.perez@mail.com" }
@@ -127,7 +139,7 @@ Clave compuesta `companyId` + `id`. `create` (201 `{ companyId, id, message }`) 
 ```
 
 ### 7.4 company / job-post / org-unit — get + list; marital-status — list
-Solo consulta. `get` recibe la clave en el body y devuelve el recurso (404 si no existe); `list` recibe `{ page, size }` y devuelve `{ page, size, items }` (200, lista vacía si no hay registros). Claves: `company` → `id`; `org-unit` → `companyId` + `id`; `job-post` → `companyId` + `unitId` + `id`; `marital-status` no tiene `get` (solo `list`).
+Solo consulta. `get` recibe la clave en el body y devuelve el recurso (404 si no existe); `list` recibe `{ page, size, paginate? }` y devuelve `{ page, size, paginate, items }` (200, lista vacía si no hay registros; ver §1.1 para `paginate`). Claves: `company` → `id`; `org-unit` → `companyId` + `id`; `job-post` → `companyId` + `unitId` + `id`; `marital-status` no tiene `get` (solo `list`).
 
 ### 7.5 GET /health · GET /health/ready
 Liveness (`{ "status": "ok" }`) y readiness (`{ "status": "ok", "countries": [...] }`, países con pool activo). Públicos, sin token ni header.

@@ -26,6 +26,7 @@ export const companyController = {
         req.countryCode!,
         dto.page ?? 1,
         dto.size ?? 20,
+        dto.paginate ?? true,
       );
       res.status(200).json(result);
     } catch (e) {

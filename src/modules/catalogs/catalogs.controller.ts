@@ -27,6 +27,7 @@ export const catalogsController = {
             municipalityId: dto.municipalityId,
             payrollTypeCode: dto.payrollTypeCode,
           },
+          dto.paginate ?? true,
         );
         res.status(200).json(result);
       } catch (e) {

@@ -1,3 +1,4 @@
+import { fetchAllPages } from '../../shared/utils/fetch-all-pages.util';
 import { CompaniesRepository } from './company.repository';
 import { InMemoryCompaniesRepository } from './in-memory-company.repository';
 
@@ -10,8 +11,15 @@ export class CompaniesService {
     return this.repo.findById(country, id);
   }
 
-  findAll(country: string, page: number, size: number) {
-    return this.repo.findAll(country, page, size);
+  async findAll(country: string, page: number, size: number, paginate = true) {
+    if (!paginate) {
+      const items = await fetchAllPages((p, s) =>
+        this.repo.findAll(country, p, s),
+      );
+      return { page: 1, size: items.length, paginate: false, items };
+    }
+    const result = await this.repo.findAll(country, page, size);
+    return { ...result, paginate: true };
   }
 }
 

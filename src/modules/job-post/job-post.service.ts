@@ -1,3 +1,4 @@
+import { fetchAllPages } from '../../shared/utils/fetch-all-pages.util';
 import { InMemoryJobPostsRepository } from './in-memory-job-post.repository';
 import { JobPostsRepository } from './job-post.repository';
 
@@ -15,15 +16,22 @@ export class JobPostsService {
     return this.repo.findById(country, companyId, unitId, id);
   }
 
-  findAll(
+  async findAll(
     country: string,
     page: number,
     size: number,
     companyId?: string,
     unitId?: string,
     positionId?: string,
+    paginate = true,
   ) {
-    return this.repo.findAll(
+    if (!paginate) {
+      const items = await fetchAllPages((p, s) =>
+        this.repo.findAll(country, p, s, companyId, unitId, positionId),
+      );
+      return { page: 1, size: items.length, paginate: false, items };
+    }
+    const result = await this.repo.findAll(
       country,
       page,
       size,
@@ -31,6 +39,7 @@ export class JobPostsService {
       unitId,
       positionId,
     );
+    return { ...result, paginate: true };
   }
 }
 

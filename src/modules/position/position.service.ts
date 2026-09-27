@@ -1,3 +1,4 @@
+import { fetchAllPages } from '../../shared/utils/fetch-all-pages.util';
 import { CreatePositionDto } from './dto/create-position.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { InMemoryPositionsRepository } from './in-memory-position.repository';
@@ -16,8 +17,21 @@ export class PositionsService {
     return this.repo.findById(country, companyId, id);
   }
 
-  findAll(country: string, page: number, size: number, companyId?: string) {
-    return this.repo.findAll(country, page, size, companyId);
+  async findAll(
+    country: string,
+    page: number,
+    size: number,
+    companyId?: string,
+    paginate = true,
+  ) {
+    if (!paginate) {
+      const items = await fetchAllPages((p, s) =>
+        this.repo.findAll(country, p, s, companyId),
+      );
+      return { page: 1, size: items.length, paginate: false, items };
+    }
+    const result = await this.repo.findAll(country, page, size, companyId);
+    return { ...result, paginate: true };
   }
 
   update(country: string, dto: UpdatePositionDto) {
