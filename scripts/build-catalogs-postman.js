@@ -31,6 +31,7 @@ const CATALOGS = [
   { key: 'compensation-funds', label: 'Compensation funds / Caja de Compensación (solo Colombia)' },
   { key: 'severance-funds', label: 'Severance funds / Fondo de Cesantías (solo Colombia)' },
   { key: 'contract-types', label: 'Contract types (Contrato)' },
+  { key: 'relacion-pago', label: 'Relación pago (envía a nómina) — sin columna de descripción' },
 ];
 
 const authHeaders = [
@@ -128,7 +129,7 @@ const collection = {
     schema:
       'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
     description:
-      '12 catálogos de solo lectura, un solo paquete Oracle compartido ' +
+      '20 catálogos de solo lectura, un solo paquete Oracle compartido ' +
       '(pkg_management_catalogs). Todos con el mismo contrato: ' +
       'POST /catalogs/<key>/list con { page, size } -> { page, size, items }.\n\n' +
       'Mismo patrón P2C que Employee/Additional CRUD: el folder Catalogs cifra ' +

@@ -14,13 +14,15 @@
  * PRC_GET_* en el paquete Oracle + su seed en
  * in-memory-catalogs.repository.ts (para pruebas con FAKE_DB).
  *
- * 19 catálogos en este arreglo: los 12 originales + 7 agregados 2026-07-29
+ * 20 catálogos en este arreglo: los 12 originales + 7 agregados 2026-07-29
  * (termination-reasons, change-reasons, pension-funds, health-providers,
  * compensation-funds, severance-funds — estos 4 solo Colombia — y
- * contract-types, EO_CONTRATO_TRABAJO).
+ * contract-types, EO_CONTRATO_TRABAJO) + relacion-pago agregado 2026-09-27
+ * (INFOCENT.NM_RELACION_PAGO, pedido PeopleOne — sin columna de
+ * descripción, a diferencia de los demás).
  *
  * "Validar reingreso" (a partir de la cédula) NO está en este arreglo: a
- * diferencia de los 18, no es una lista paginada — es un solo endpoint
+ * diferencia de los demás, no es una lista paginada — es un solo endpoint
  * dedicado, POST /catalogs/validate-reentry (ver PRC_VALIDATE_REENTRY en
  * db/pkg_management_catalogs_api.sql y catalogs.route.ts).
  */
@@ -162,6 +164,13 @@ export const CATALOG_DEFINITIONS: CatalogDefinition[] = [
     procedure: 'prc_get_contract_types',
     jsonKey: 'contractTypes',
     label: 'Tipos de contrato de trabajo ("Contrato")',
+  },
+  {
+    key: 'relacion-pago',
+    procedure: 'prc_get_relacion_pago',
+    jsonKey: 'paymentRelations',
+    label:
+      'Relación pago (envía a nómina) — INFOCENT.NM_RELACION_PAGO, sin columna de descripción',
   },
 ];
 

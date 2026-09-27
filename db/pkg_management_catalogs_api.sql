@@ -143,6 +143,14 @@ CREATE OR REPLACE PACKAGE PKG_MANAGEMENT_CATALOGS AS
                                  O_COD     OUT VARCHAR2,
                                  O_MESSAGE OUT VARCHAR2);
 
+  -- 21ª (2026-09-27): INFOCENT.NM_RELACION_PAGO ("Relación pago (envía a
+  -- nómina)", pedido Andros/PeopleOne 2026-09-23) — confirmada vía DESCRIBE.
+  -- Sin columna de descripción; se expone igual como catálogo paginado.
+  PROCEDURE PRC_GET_RELACION_PAGO(I_JSON    IN CLOB,
+                                  O_JSON    OUT CLOB,
+                                  O_COD     OUT VARCHAR2,
+                                  O_MESSAGE OUT VARCHAR2);
+
 END PKG_MANAGEMENT_CATALOGS;
 /
 create or replace PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
@@ -2135,6 +2143,92 @@ create or replace PACKAGE BODY PKG_MANAGEMENT_CATALOGS AS
       O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
       O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM, 'CORSOX.FTD_INGRESOS');
   END PRC_VALIDATE_REENTRY;
+
+  /*=========================================================================
+   RELACIÓN PAGO — INFOCENT.NM_RELACION_PAGO (confirmada vía DESCRIBE,
+   2026-09-27; pedido Andros/PeopleOne 2026-09-23: "select * from
+   infocent.nm_relacion_pago -- Relación pago (envía a nómina)"). A
+   diferencia de los otros 18 catálogos, esta tabla NO tiene columna de
+   descripción/nombre — es un registro de relación de pago por
+   empresa+ficha+período (ID_EMPRESA, FICHA NOT NULL; el resto son IDs de
+   nómina/grupo/rotación/proceso/período). Se expone igual como catálogo
+   paginado, sin filtros (decisión explícita: si luego hace falta filtrar
+   por companyId/ficha/período se agrega después). Columnas de auditoría
+   (USRCRE/FECCRE/USRACT/FECACT) NO se exponen, igual que el resto del API.
+  ==========================================================================*/
+  PROCEDURE PRC_GET_RELACION_PAGO(I_JSON    IN CLOB,
+                                  O_JSON    OUT CLOB,
+                                  O_COD     OUT VARCHAR2,
+                                  O_MESSAGE OUT VARCHAR2) IS
+    V_PAGE  NUMBER;
+    V_SIZE  NUMBER;
+    V_ARRAY CLOB;
+    V_ROW   VARCHAR2(32767);
+    V_COUNT PLS_INTEGER := 0;
+  BEGIN
+    O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_EXITO;
+    O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_EXITO;
+
+    PRC_PARSE_PAGE(I_JSON, V_PAGE, V_SIZE);
+    IF V_PAGE < 1 THEN V_PAGE := 1; END IF;
+    IF V_SIZE < 1 THEN V_SIZE := 20; END IF;
+    IF V_SIZE > 100 THEN V_SIZE := 100; END IF;
+
+    DBMS_LOB.CREATETEMPORARY(V_ARRAY, TRUE);
+    DBMS_LOB.APPEND(V_ARRAY, '[');
+
+    FOR R IN (SELECT N.ID_EMPRESA, N.FICHA, N.ID_NOMINA, N.ID_GRUPO,
+                     N.ID_ROTACION, N.ID_DIS_NOMINA, N.ID_EXCEPCION,
+                     N.ID_PROCESO, N.SUB_PROCESO, N.ANO_PERIODO,
+                     N.NRO_PERIODO, N.ID_DESCANSO
+                FROM INFOCENT.NM_RELACION_PAGO N
+               ORDER BY N.ID_EMPRESA, N.FICHA
+              OFFSET (V_PAGE - 1) * V_SIZE ROWS FETCH NEXT V_SIZE ROWS ONLY)
+    LOOP
+      IF V_COUNT > 0 THEN
+        DBMS_LOB.APPEND(V_ARRAY, ',');
+      END IF;
+
+      V_ROW := '{'
+               || FN_JSON_PAIR_CC('companyId', R.ID_EMPRESA) || ','
+               || FN_JSON_PAIR_CC('ficha', R.FICHA) || ','
+               || FN_JSON_PAIR_CC('payrollId', R.ID_NOMINA) || ','
+               || FN_JSON_PAIR_CC('groupId', R.ID_GRUPO) || ','
+               || FN_JSON_PAIR_CC('rotationId', TO_CHAR(R.ID_ROTACION)) || ','
+               || FN_JSON_PAIR_CC('payrollDistributionId', R.ID_DIS_NOMINA) || ','
+               || FN_JSON_PAIR_CC('exceptionId', R.ID_EXCEPCION) || ','
+               || FN_JSON_PAIR_CC('processId', TO_CHAR(R.ID_PROCESO)) || ','
+               || FN_JSON_PAIR_CC('subProcess', TO_CHAR(R.SUB_PROCESO)) || ','
+               || FN_JSON_PAIR_CC('periodYear', TO_CHAR(R.ANO_PERIODO)) || ','
+               || FN_JSON_PAIR_CC('periodNumber', TO_CHAR(R.NRO_PERIODO)) || ','
+               || FN_JSON_PAIR_CC('restId', R.ID_DESCANSO)
+               || '}';
+
+      DBMS_LOB.APPEND(V_ARRAY, V_ROW);
+      V_COUNT := V_COUNT + 1;
+    END LOOP;
+
+    DBMS_LOB.APPEND(V_ARRAY, ']');
+
+    IF V_COUNT = 0 THEN
+      O_COD     := PKG_GLOBAL_CONSTANTS.GC_CODIGO_SIN_REGISTROS;
+      O_MESSAGE := PKG_GLOBAL_CONSTANTS.GC_MENSAJE_SIN_REGISTROS;
+      O_JSON    := NULL;
+    ELSE
+      O_JSON := '{"paymentRelations":' || V_ARRAY || '}';
+    END IF;
+
+    DBMS_LOB.FREETEMPORARY(V_ARRAY);
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF V_ARRAY IS NOT NULL AND DBMS_LOB.ISTEMPORARY(V_ARRAY) = 1 THEN
+        DBMS_LOB.FREETEMPORARY(V_ARRAY);
+      END IF;
+      O_COD     := 'ORA-' || TO_CHAR(ABS(SQLCODE));
+      O_MESSAGE := PKG_GLOBAL_ERRORS.FN_GET_ERROR_MESSAGE(SQLCODE, SQLERRM,
+                                        'INFOCENT.NM_RELACION_PAGO');
+  END PRC_GET_RELACION_PAGO;
 
 END PKG_MANAGEMENT_CATALOGS;
 /

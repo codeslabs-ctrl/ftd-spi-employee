@@ -82,6 +82,36 @@ const SEED: Record<string, Record<string, unknown>[]> = {
     { companyId: '101', code: '2', name: 'Termino Indefinido' },
     { companyId: '101', code: '4', name: 'Aprendizaje' },
   ],
+  'relacion-pago': [
+    {
+      companyId: '1',
+      ficha: '1001',
+      payrollId: '1',
+      groupId: '01',
+      rotationId: '1',
+      payrollDistributionId: '1',
+      exceptionId: null,
+      processId: '1',
+      subProcess: '1',
+      periodYear: '2026',
+      periodNumber: '9',
+      restId: null,
+    },
+    {
+      companyId: '1',
+      ficha: '1002',
+      payrollId: '1',
+      groupId: '01',
+      rotationId: '2',
+      payrollDistributionId: '1',
+      exceptionId: null,
+      processId: '1',
+      subProcess: '1',
+      periodYear: '2026',
+      periodNumber: '9',
+      restId: 'DOM',
+    },
+  ],
 };
 
 // Cédulas de prueba con "rastro previo" simulado (equivalente a tener una

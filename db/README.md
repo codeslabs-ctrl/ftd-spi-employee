@@ -28,7 +28,7 @@ Todos los `PKG_MANAGEMENT_*` la llaman calificada (`PKG_GLOBAL_ERRORS.FN_GET_ERR
 
 Nota histórica: en la verificación inicial (2026-07-16) `INFOCENT.EO_PUESTO` no aparecía en QA VE y solo se encontraba `INFOCENT.TA_RELACION_PUESTO` (relación laboral). Ya se confirmó que la tabla existe con las columnas esperadas (`ID_EMPRESA, ID_UNIDAD, ID, NOMBRE, ID_CARGO, DESCRIP, FUNCION, FECHA_INI, FECHA_FIN, RIESGO`), así que el paquete se reescribió con `SELECT` estático (mismo estilo que `position`) en vez del SQL dinámico que se usaba como salvaguarda.
 
-## `pkg_management_catalogs_api.sql` — un solo paquete para 19 catálogos + validar reingreso
+## `pkg_management_catalogs_api.sql` — un solo paquete para 20 catálogos + validar reingreso
 
 Un único paquete Oracle (`PKG_MANAGEMENT_CATALOGS`) agrupa el GET de todos los catálogos de solo lectura pedidos: municipios, países, parroquias, localidades, ciudades, entidades federales, tipos de nómina, grupos, sucursales, bancos, tipos de cuenta, tipos de identificación, causales de retiro, motivos de cambio, tipos de contrato de trabajo, y (solo Colombia) fondos de pensión/AFP, EPS, cajas de compensación y fondos de cesantías. Más `PRC_VALIDATE_REENTRY` ("Validar reingreso"), el único que escribe.
 
@@ -62,6 +62,8 @@ Convención de nombres: procedimientos/funciones del paquete en inglés (`PRC_GE
 - `INFOCENT.NMT020` — 4 tipos de institución adicionales, solo Colombia, mismo patrón que `banks` (`TIPI_CODTIP='01'`): AFP → `pension-funds` (`TIPI_CODTIP='PE'`), EPS → `health-providers` (`'SA'`), Caja de Compensación → `compensation-funds` (`'CA'`), Fondo de Cesantías → `severance-funds` (`'CE'`, tipo nuevo no visto antes). Las 4 reutilizan `PRC_PARSE_BANKS_FILTER` (genérico) y las mismas columnas/JSON que `banks`. ✅ Confirmadas.
 
 **20ª (2026-07-29) — `INFOCENT.EO_CONTRATO_TRABAJO` (→ `contract-types`, "Contrato"):** ya con permisos, confirmada. Columnas: `ID_EMPRESA`, `ID`, `NOMBRE`, `ID_TIPO_CONTRATO`, `NUM_TOPE`, `DURACION_MAX`, `LAPSO_ESPERA`, `DURACION_MAX_ACUM`, `OBSERVACIONES` + auditoría. Scoped por `ID_EMPRESA` — `companyId` OPCIONAL (reutiliza `PRC_PARSE_BANKS_FILTER`). `NUM_TOPE`/`DURACION_MAX`/`LAPSO_ESPERA`/`DURACION_MAX_ACUM` se exponen literales — unidades (días/meses) no confirmadas. ✅ Confirmada y wireing Node probado con FAKE_DB.
+
+**21ª (2026-09-27) — `INFOCENT.NM_RELACION_PAGO` (→ `relacion-pago`, "Relación pago (envía a nómina)"):** pedido de Andros/PeopleOne 2026-09-23 (correo original decía `select * from infocent.nm_relacion_pago`, sin columnas). Confirmada vía `DESCRIBE` compartido por el usuario. Columnas: `ID_EMPRESA` (NOT NULL), `FICHA` (NOT NULL), `ID_NOMINA`, `ID_GRUPO`, `ID_ROTACION`, `ID_DIS_NOMINA`, `ID_EXCEPCION`, `ID_PROCESO`, `SUB_PROCESO`, `ANO_PERIODO`, `NRO_PERIODO`, `ID_DESCANSO` + auditoría. A diferencia de los otros 19, **no tiene columna de descripción/nombre** — es un registro de relación de pago por empresa+ficha+período, no un catálogo código+descripción. Se expone igual como lista paginada (`PRC_GET_RELACION_PAGO`, mismo patrón que `PRC_GET_ID_TYPES`: `PRC_PARSE_PAGE` compartido, sin filtros — decisión explícita del usuario). Auditoría (`USRCRE`/`FECCRE`/`USRACT`/`FECACT`) no se expone. ✅ Wireing Node completo y probado con FAKE_DB; **pendiente compilar en QA/producción** (paquete aún no recompilado con este cambio).
 
 **Pendiente:**
 - Confirmar el `DOMAIN` correcto de `cities` (`SPI_REF`) — pendiente de conversación del usuario con la persona que dio la información original.
